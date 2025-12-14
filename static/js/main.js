@@ -340,7 +340,7 @@ function renderSentimentChart(distribution) {
             labels: Object.keys(distribution),
             datasets: [{
                 data: Object.values(distribution),
-                backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'], // Adjust as needed
+                backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#4f46e5'], // Green, Red, Amber, Indigo
             }]
         }
     });

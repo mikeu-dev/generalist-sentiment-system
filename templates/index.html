@@ -6,16 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generalist Sentiment Analysis System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
     <header>
-        <div class="container">
+        <div class="container header-content">
             <h1>Sentiment & Opinion Mining System</h1>
-            <p>Analisis sentimen dan pengelompokan topik ulasan secara otomatis.</p>
+            <p>Platform analisis sentimen canggih untuk pemahaman mendalam tentang opini publik.</p>
         </div>
     </header>
 
@@ -23,57 +24,68 @@
 
         <!-- Status Model -->
         <div class="status-bar">
+            <span class="status-indicator"></span>
             Status Model:
             <span id="model-status" class="{{ 'status-ready' if model_trained else 'status-not-ready' }}">
-                {{ 'Siap Digunakan' if model_trained else 'Belum Dilatih (Fitur Klasifikasi Non-Aktif)' }}
+                {{ 'Siap Digunakan' if model_trained else 'Belum Dilatih' }}
             </span>
         </div>
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('analyze')">Upload File</button>
-            <button class="tab-btn" onclick="switchTab('search')">Cari Dataset (Baru)</button>
-            <button class="tab-btn" onclick="switchTab('train')">Training Model</button>
+            <button class="tab-btn active" onclick="switchTab('analyze')">
+                <i class="ph ph-upload-simple"></i> Upload File
+            </button>
+            <button class="tab-btn" onclick="switchTab('search')">
+                <i class="ph ph-globe"></i> Cari Dataset
+            </button>
+            <button class="tab-btn" onclick="switchTab('train')">
+                <i class="ph ph-brain"></i> Training Model
+            </button>
         </div>
 
         <!-- Search Section -->
         <section id="search-section" class="tab-content">
             <div class="card">
-                <h2>Cari Dataset & Analisis Otomatis</h2>
-                <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15", "Pilpres") untuk mencari data dari internet dan
-                    menganalisis sentimennya.</p>
+                <h2><i class="ph ph-magnifying-glass"></i> Cari Dataset & Analisis Otomatis</h2>
+                <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15") untuk mencari data real-time dan menganalisis
+                    sentimennya.</p>
                 <form id="search-form">
                     <div style="margin-bottom: 20px;">
-                        <input type="text" name="query" placeholder="Ketik topik di sini..." required
-                            style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;">
+                        <input type="text" name="query" placeholder="Ketik topik atau kata kunci..." required
+                            autocomplete="off">
                     </div>
-                    <button type="submit" class="btn-primary">Cari & Analisis</button>
+                    <button type="submit" class="btn-primary">
+                        <i class="ph ph-magnifying-glass"></i> Cari & Analisis
+                    </button>
                 </form>
-                <div id="search-loading" class="loading hidden">Sedang mencari data dari internet dan menganalisis...
-                </div>
+                <div id="search-loading" class="loading hidden">Sedang mencari data dan menganalisis...</div>
             </div>
         </section>
 
         <!-- Analyze Section -->
         <section id="analyze-section" class="tab-content active">
             <div class="card">
-                <h2>Upload Data Ulasan</h2>
-                <p>Upload file CSV atau Excel berisi ulasan (harus ada kolom teks).</p>
+                <h2><i class="ph ph-file-text"></i> Upload Data Ulasan</h2>
+                <p>Upload file CSV atau Excel yang berisi kolom ulasan untuk dianalisis.</p>
                 <form id="analyze-form">
                     <div class="file-drop-area">
+                        <i class="ph ph-file-arrow-up file-icon"></i>
                         <span class="fake-btn">Pilih File</span>
-                        <span class="file-msg">atau drag and drop file di sini</span>
+                        <span class="file-msg">atau drag and drop file di sini (.csv, .xlsx)</span>
                         <input class="file-input" type="file" name="file" accept=".csv, .xlsx" required>
                     </div>
-                    <button type="submit" class="btn-primary">Analisis Sekarang</button>
+                    <button type="submit" class="btn-primary">
+                        <i class="ph ph-lightning"></i> Analisis Sekarang
+                    </button>
                 </form>
-                <div id="analyze-loading" class="loading hidden">Sedang menganalisis...</div>
+                <div id="analyze-loading" class="loading hidden">Sedang memproses data...</div>
             </div>
 
             <div id="results-container" class="hidden">
                 <div style="text-align: right; margin-bottom: 20px;">
-                    <button id="download-btn" class="btn-secondary" style="width: auto; padding: 10px 20px;">
-                        ⬇ Download CSV
+                    <button id="download-btn" class="btn-secondary">
+                        <i class="ph ph-download-simple"></i> Download CSV
                     </button>
                 </div>
 
@@ -92,8 +104,7 @@
                     <div class="chart-card">
                         <h3>Distribusi Sentimen</h3>
                         <canvas id="sentimentChart"></canvas>
-                        <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih, sentimen tidak
-                            tersedia.</p>
+                        <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih.</p>
                     </div>
                     <div class="chart-card">
                         <h3>Cluster Topik (K-Means)</h3>
@@ -102,7 +113,7 @@
                 </div>
 
                 <div class="card">
-                    <h3>Sampel Data & Prediksi</h3>
+                    <h2><i class="ph ph-table"></i> Sampel Data & Prediksi</h2>
                     <div class="table-responsive">
                         <table id="result-table">
                             <thead>
@@ -124,20 +135,25 @@
         <!-- Train Section -->
         <section id="train-section" class="tab-content">
             <div class="card">
-                <h2>Training Model Baru</h2>
-                <p>Upload dataset berlabel untuk melatih ulang model Naive Bayes.</p>
-                <div class="alert-info">
+                <h2><i class="ph ph-graduation-cap"></i> Training Model Baru</h2>
+                <p>Latih ulang model Naive Bayes dengan dataset khusus Anda.</p>
+                <div class="alert-info"
+                    style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 15px; margin-bottom: 20px; font-size: 0.9em; color: #1e3a8a;">
+                    <i class="ph ph-info" style="vertical-align: middle; margin-right: 5px;"></i>
                     Format wajib: Kolom <strong>text</strong> dan <strong>label</strong>.
                 </div>
                 <form id="train-form">
                     <div class="file-drop-area">
+                        <i class="ph ph-database file-icon"></i>
                         <span class="fake-btn">Pilih Dataset Training</span>
                         <span class="file-msg">Format .csv atau .xlsx</span>
                         <input class="file-input" type="file" name="file" accept=".csv, .xlsx" required>
                     </div>
-                    <button type="submit" class="btn-secondary">Mulai Training</button>
+                    <button type="submit" class="btn-primary">
+                        <i class="ph ph-play"></i> Mulai Training
+                    </button>
                 </form>
-                <div id="train-loading" class="loading hidden">Sedang melatih model... (bisa memakan waktu)</div>
+                <div id="train-loading" class="loading hidden">Sedang melatih model...</div>
                 <div id="train-result" class="hidden"></div>
             </div>
         </section>
@@ -145,7 +161,10 @@
     </main>
 
     <footer>
-        <p>&copy; 2025 Generalist Sentiment Analysis System</p>
+        <div class="container"
+            style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.9em;">
+            <p>&copy; 2025 Generalist Sentiment Analysis System. All rights reserved.</p>
+        </div>
     </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
