@@ -287,6 +287,12 @@ function pollTrainingStatus() {
                     document.getElementById('model-status').textContent = "Siap Digunakan";
                     document.getElementById('model-status').className = "status-ready";
                     showToast(status.result.message, 'success');
+
+                    // Render Metrics if available
+                    if (status.result.metrics) {
+                        renderTrainingMetrics(status.result.metrics);
+                    }
+
                 } else if (status.result && !status.result.success) {
                     resultDiv.innerHTML = `<div class="alert-error" style="color: red; margin-top: 10px;">Error: ${status.result.error}</div>`;
                     showToast('Training Gagal: ' + status.result.error, 'error');
@@ -311,6 +317,74 @@ function pollTrainingStatus() {
 
     // Start polling
     checkStatus();
+}
+
+function renderTrainingMetrics(metrics) {
+    const container = document.getElementById('train-metrics');
+    if (!container) return;
+
+    // Accuracy
+    const acc = (metrics.accuracy * 100).toFixed(2) + '%';
+    document.getElementById('metric-accuracy').textContent = acc;
+
+    // Version (if available in future, for now placeholder or use a default)
+    document.getElementById('metric-version').textContent = "v1.1 (Auto-Tuned)";
+
+    // Classification Report
+    const reportTable = document.querySelector('#classification-report-table tbody');
+    reportTable.innerHTML = '';
+
+    // Helper to format number
+    const fmt = (n) => (typeof n === 'number' ? n.toFixed(2) : n);
+
+    if (metrics.classification_report) {
+        for (const [key, val] of Object.entries(metrics.classification_report)) {
+            if (typeof val === 'object') { // Skip 'accuracy' key which is a float directly sometimes or in dict
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="font-weight: 500;">${key}</td>
+                    <td>${fmt(val.precision)}</td>
+                    <td>${fmt(val.recall)}</td>
+                    <td>${fmt(val['f1-score'])}</td>
+                    <td>${val.support}</td>
+                `;
+                reportTable.appendChild(row);
+            }
+        }
+    }
+
+    // Confusion Matrix
+    if (metrics.confusion_matrix && metrics.classes) {
+        const cmTable = document.getElementById('confusion-matrix-table');
+        cmTable.innerHTML = '';
+
+        // Header Row
+        const thead = document.createElement('thead');
+        let headerHtml = '<tr><th>Actual \\ Predicted</th>';
+        metrics.classes.forEach(cls => {
+            headerHtml += `<th>${cls}</th>`;
+        });
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+        cmTable.appendChild(thead);
+
+        // Body
+        const tbody = document.createElement('tbody');
+        metrics.confusion_matrix.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            let rowHtml = `<td style="font-weight: bold;">${metrics.classes[i]}</td>`;
+            row.forEach((cell, j) => {
+                // Highlight diagonal
+                const style = i === j ? 'background-color: #dcfce7; font-weight: bold;' : '';
+                rowHtml += `<td style="${style}">${cell}</td>`;
+            });
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+        cmTable.appendChild(tbody);
+    }
+
+    container.classList.remove('hidden');
 }
 
 let sentimentChart = null;

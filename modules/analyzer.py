@@ -9,7 +9,7 @@ import os
 import datetime
 import glob
 import logging
-from typing import List, Union, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 
 from modules.lexicon_data import POSITIVE_WORDS, NEGATIVE_WORDS
 try:
@@ -52,21 +52,33 @@ class SentimentAnalyzer:
             logger.error(f"Failed to load HF model: {e}")
             return False
 
-    def train(self, texts: List[str], labels: List[str]) -> None:
+    def train(self, texts: List[str], labels: List[str]) -> Dict[str, Any]:
         """
         Melatih model dengan GridSearchCV untuk mencari hyperparameter optimal.
+        Melakukan evaluasi menggunakan train_test_split sebelum training final.
         """
         logger.info(f"Training model with {len(texts)} data points...")
+        
+        metrics = {}
+        
         try:
-            X = self.vectorizer.fit_transform(texts)
+            # 1. Split Data untuk Evaluasi (80% Train, 20% Test)
+            from sklearn.model_selection import train_test_split
+            from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
             
-            # Define Parameter Grid for LinearSVC
+            X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42, stratify=labels)
+            
+            # Vectorize Train
+            X_train_vec = self.vectorizer.fit_transform(X_train)
+            X_test_vec = self.vectorizer.transform(X_test)
+
+            # Define Parameter Grid
             param_grid = {
                 'C': [0.01, 0.1, 1, 10],
                 'class_weight': [None, 'balanced']
             }
             
-            # Grid Search
+            # 2. Grid Search pada Training Set
             logger.info("Starting GridSearchCV for hyperparameter tuning...")
             grid = GridSearchCV(
                 LinearSVC(random_state=42, max_iter=2000), 
@@ -75,21 +87,43 @@ class SentimentAnalyzer:
                 n_jobs=-1,
                 scoring='accuracy'
             )
-            grid.fit(X, labels)
+            grid.fit(X_train_vec, y_train)
             
-            best_model = grid.best_estimator_
-            logger.info(f"Best parameters found: {grid.best_params_}")
-            logger.info(f"Best CV Score: {grid.best_score_:.4f}")
+            best_model_eval = grid.best_estimator_
             
-            # Wrap in CalibratedClassifierCV for probability outputs
-            # We refit on the whole dataset to ensure calibration uses all data
-            self.classifier = CalibratedClassifierCV(best_model, cv=5)
-            self.classifier.fit(X, labels)
+            # 3. Evaluasi pada Test Set
+            y_pred = best_model_eval.predict(X_test_vec)
+            
+            metrics['accuracy'] = accuracy_score(y_test, y_pred)
+            metrics['confusion_matrix'] = confusion_matrix(y_test, y_pred, labels=grid.classes_).tolist()
+            metrics['classification_report'] = classification_report(y_test, y_pred, output_dict=True)
+            metrics['classes'] = grid.classes_.tolist()
+            metrics['best_params'] = grid.best_params_
+            
+            logger.info(f"Evaluation Metrics: Accuracy={metrics['accuracy']:.4f}")
+
+            # 4. Retrain pada Full Dataset untuk Production
+            logger.info("Retraining on full dataset...")
+            X_full = self.vectorizer.fit_transform(texts)
+            
+            # Gunakan best params dari phase sebelumnya
+            final_model = LinearSVC(
+                random_state=42, 
+                max_iter=3000, 
+                C=grid.best_params_['C'], 
+                class_weight=grid.best_params_['class_weight']
+            )
+            
+            # Wrap in CalibratedClassifierCV
+            self.classifier = CalibratedClassifierCV(final_model, cv=5)
+            self.classifier.fit(X_full, labels)
             
             self.is_trained = True
-            self.current_model_version = f"v1.0.0_tuned_{grid.best_params_['C']}"
+            self.current_model_version = f"v1.1.0_tuned_{grid.best_params_['C']}"
             self.save_model()
-            logger.info("Model tuned, calibrated, trained, and saved.")
+            logger.info("Model tuned, evaluated, retrained, and saved.")
+            
+            return metrics
             
         except Exception as e:
             logger.error(f"Error during training: {e}")

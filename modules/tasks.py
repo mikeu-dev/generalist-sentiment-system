@@ -59,12 +59,13 @@ def run_training_background(filepath, app_config_upload_folder):
         manager.update_status(progress=80, message="Melatih model Naive Bayes...")
         
         # Train
-        analyzer.train(clean_texts, labels)
+        metrics = analyzer.train(clean_texts, labels)
         
         result = {
             "success": True,
             "data_count": len(texts),
-            "message": f"Model berhasil dilatih dengan {len(texts)} data baris."
+            "message": f"Model berhasil dilatih dengan {len(texts)} data baris.",
+            "metrics": metrics
         }
         manager.finish_training(result)
         

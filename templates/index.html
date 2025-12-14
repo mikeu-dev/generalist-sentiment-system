@@ -195,6 +195,51 @@
                 </form>
                 <div id="train-loading" class="loading hidden">Sedang melatih model...</div>
                 <div id="train-result" class="hidden"></div>
+
+                <!-- Evaluation Metrics Section -->
+                <div id="train-metrics" class="hidden"
+                    style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <h3><i class="ph ph-chart-bar"></i> Evaluasi Model</h3>
+
+                    <div class="metrics-grid"
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div class="metric-card"
+                            style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                            <div style="font-size: 0.9em; color: #166534;">Akurasi</div>
+                            <div id="metric-accuracy" style="font-size: 1.5em; font-weight: bold; color: #15803d;">-
+                            </div>
+                        </div>
+                        <div class="metric-card"
+                            style="background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                            <div style="font-size: 0.9em; color: #1e40af;">Versi Model</div>
+                            <div id="metric-version" style="font-size: 1.2em; font-weight: bold; color: #1d4ed8;">-
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4>Laporan Klasifikasi</h4>
+                    <div class="table-responsive">
+                        <table id="classification-report-table" class="table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Kelas</th>
+                                    <th>Precision</th>
+                                    <th>Recall</th>
+                                    <th>F1-Score</th>
+                                    <th>Support</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <h4 style="margin-top: 20px;">Confusion Matrix</h4>
+                    <div class="table-responsive">
+                        <table id="confusion-matrix-table" class="table-sm" style="text-align: center;">
+                            <!-- Will be populated by JS -->
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
 
