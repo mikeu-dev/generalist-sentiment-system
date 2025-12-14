@@ -295,8 +295,20 @@ function renderResults(data) {
         const safeCluster = item.cluster !== undefined ? 'Cluster ' + escapeHtml(item.cluster) : '-';
         const safeSentiment = escapeHtml(item.sentiment || '-');
 
+        let sourceHtml = '-';
+        if (item.source) {
+            if (item.source.startsWith('http')) {
+                const safeUrl = escapeHtml(item.source);
+                const safeTitle = escapeHtml(item.title || item.source);
+                sourceHtml = `<a href="${safeUrl}" target="_blank" title="${safeUrl}">${safeTitle}</a>`;
+            } else {
+                sourceHtml = escapeHtml(item.source);
+            }
+        }
+
         tr.innerHTML = `
             <td>${shortText}</td>
+            <td>${sourceHtml}</td>
             <td>${safeSentiment}</td>
             <td>${safeCluster}</td>
         `;

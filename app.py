@@ -216,7 +216,9 @@ def analyze():
                         "text": text,
                         "sentiment": detail['label'],
                         "cluster": cluster_id,
-                        "score": detail['sentiment_score']
+                        "score": detail['sentiment_score'],
+                        "source": file.filename,
+                        "title": "File Upload"
                     })
                 
                 # Distribution stats
@@ -298,7 +300,9 @@ def search_and_analyze():
             
         # 2. Preprocess
         logger.info("Preprocessing search results...")
-        clean_texts = preprocessor.preprocess_batch(raw_texts)
+        # raw_texts is now a list of dicts: [{'text':..., 'source':..., 'title':...}]
+        texts_only = [r['text'] for r in raw_texts]
+        clean_texts = preprocessor.preprocess_batch(texts_only)
         
         results = {
             "query": query,
@@ -317,7 +321,11 @@ def search_and_analyze():
         distribution = {}
         cluster_counts = {}
         
-        for i, text in enumerate(raw_texts):
+        for i, item in enumerate(raw_texts):
+            text = item['text']
+            source = item['source']
+            title = item.get('title', 'No Title')
+            
             detail = details[i]
             cluster_id = int(clusters[i]) if i < len(clusters) else 0
             
@@ -328,8 +336,8 @@ def search_and_analyze():
                 sentiment_score=detail['sentiment_score'],
                 confidence_score=detail['confidence_score'],
                 cluster=cluster_id,
-                source='web_search',
-                metadata_json={'query': query},
+                source=source,
+                metadata_json={'query': query, 'title': title},
                 model_version=detail['model_version']
             )
             db.session.add(log)
@@ -339,7 +347,9 @@ def search_and_analyze():
                 preview_data.append({
                     "text": text,
                     "sentiment": detail['label'],
-                    "cluster": cluster_id
+                    "cluster": cluster_id,
+                    "source": source,
+                    "title": title
                 })
             
             # Stats

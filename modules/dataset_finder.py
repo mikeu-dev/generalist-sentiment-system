@@ -33,10 +33,17 @@ class DatasetFinder:
                         if ddg_results:
                             current_batch = []
                             for res in ddg_results:
+                                item = {}
                                 if 'body' in res:
-                                    current_batch.append(res['body'])
+                                    item['text'] = res['body']
                                 elif 'snippet' in res:
-                                    current_batch.append(res['snippet'])
+                                    item['text'] = res['snippet']
+                                else:
+                                    continue
+                                
+                                item['source'] = res.get('href', 'Unknown')
+                                item['title'] = res.get('title', 'No Title')
+                                current_batch.append(item)
                             
                             if current_batch:
                                 results.extend(current_batch)
@@ -64,7 +71,14 @@ class DatasetFinder:
         # Scrape / cleaning logic fallback? 
         # For now just return what we have.
         
-        unique_results = list(set(results))
+        # Remove duplicates based on text
+        seen_texts = set()
+        unique_results = []
+        for r in results:
+            if r['text'] not in seen_texts:
+                seen_texts.add(r['text'])
+                unique_results.append(r)
+                
         return unique_results
 
 if __name__ == "__main__":
