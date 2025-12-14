@@ -1,21 +1,32 @@
 from flask import Flask, render_template, request, jsonify
 import os
 import pandas as pd
+import logging
+from logging.config import dictConfig
+from config import DevelopmentConfig, ProductionConfig
 from modules.preprocessor import TextPreprocessor
 from modules.analyzer import SentimentAnalyzer
 
+# Configure Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+
+# Load Config
+if os.environ.get('FLASK_ENV') == 'production':
+    app.config.from_object(ProductionConfig)
+else:
+    app.config.from_object(DevelopmentConfig)
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize modules
-print("Loading modules...")
+logger.info("Loading modules...")
 preprocessor = TextPreprocessor()
 analyzer = SentimentAnalyzer()
-print("Modules loaded.")
+logger.info("Modules loaded.")
 
 @app.route('/')
 def index():
@@ -89,7 +100,7 @@ def run_training_background(filepath, app_config_upload_folder):
         }
         
     except Exception as e:
-        print(f"Training Error: {e}")
+        logger.error(f"Training Error: {e}")
         training_status["progress"] = 0
         training_status["message"] = f"Error: {str(e)}"
         training_status["result"] = {"success": False, "error": str(e)}
@@ -159,7 +170,7 @@ def analyze():
             
             raw_texts = df[text_col].astype(str).tolist()
             
-            print("Preprocessing data for analysis...")
+            logger.info("Preprocessing data for analysis...")
             clean_texts = preprocessor.preprocess_batch(raw_texts)
             
             results = {"total": len(raw_texts), "distribution": {}, "clusters": []}
@@ -185,7 +196,7 @@ def analyze():
                 # Convert valid int64 to int for JSON serialization
                 results['cluster_counts'] = {int(k): int(v) for k, v in cluster_counts.items()}
             except Exception as e:
-                print(f"Clustering error: {e}")
+                logger.error(f"Clustering error: {e}")
                 results['cluster_error'] = str(e)
 
             # Prepare sample data for frontend (first 100 rows)
@@ -217,18 +228,18 @@ def search_and_analyze():
         return jsonify({"error": "Query required"}), 400
     
     query = data['query']
-    print(f"Received search query: {query}")
+    logger.info(f"Received search query: {query}")
     
     try:
         # 1. Search
-        print("Searching web...")
+        logger.info("Searching web...")
         raw_texts = dataset_finder.search(query, max_results=50)
         
         if not raw_texts:
             return jsonify({"error": "Tidak ada data ditemukan untuk topik tersebut."}), 404
             
         # 2. Preprocess
-        print("Preprocessing search results...")
+        logger.info("Preprocessing search results...")
         clean_texts = preprocessor.preprocess_batch(raw_texts)
         
         results = {
@@ -250,13 +261,13 @@ def search_and_analyze():
             
             if not analyzer.is_trained:
                  results['method'] = "lexicon_fallback"
-                 print("Using Lexicon Method (Bootstrap)")
+                 logger.info("Using Lexicon Method (Bootstrap)")
             else:
                  results['method'] = "model_prediction"
 
         except Exception as e:
              results['warning'] = f"Gagal memprediksi: {str(e)}"
-             print(f"Prediction error: {e}")
+             logger.error(f"Prediction error: {e}")
 
         # 4. Clustering
 
@@ -280,7 +291,7 @@ def search_and_analyze():
                 results['data'] = preview_data
                 
         except Exception as e:
-            print(f"Clustering error: {e}")
+            logger.error(f"Clustering error: {e}")
             results['cluster_error'] = str(e)
             
         return jsonify(results)

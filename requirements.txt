@@ -8,3 +8,5 @@ wordcloud
 ddgs
 beautifulsoup4
 requests
+pytest
+gunicorn
