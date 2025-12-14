@@ -14,15 +14,95 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Initialize modules
 print("Loading modules...")
 preprocessor = TextPreprocessor()
-analyzer = SentimentAnalyzer(model_path='model_sentiment.pkl')
+analyzer = SentimentAnalyzer()
 print("Modules loaded.")
 
 @app.route('/')
 def index():
     return render_template('index.html', model_trained=analyzer.is_trained)
 
+import threading
+import time
+
+# Training Status State
+training_status = {
+    "is_training": False,
+    "progress": 0,
+    "message": "Idle",
+    "result": None
+}
+
+def run_training_background(filepath, app_config_upload_folder):
+    global training_status
+    training_status["is_training"] = True
+    training_status["progress"] = 0
+    training_status["message"] = "Memulai proses training..."
+    training_status["result"] = None
+    
+    try:
+        # Read file
+        training_status["message"] = "Membaca file dataset..."
+        training_status["progress"] = 10
+        
+        if filepath.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        elif filepath.endswith('.xlsx'):
+            df = pd.read_excel(filepath)
+        else:
+            raise ValueError("Format file tidak didukung.")
+
+        # Validate columns
+        if 'text' not in df.columns or 'label' not in df.columns:
+            raise ValueError("Dataset harus memiliki kolom 'text' dan 'label'.")
+        
+        # Cleaning
+        training_status["message"] = "Membersihkan data..."
+        training_status["progress"] = 20
+        df = df.dropna(subset=['text', 'label'])
+        df = df[df['text'].astype(str).str.strip() != '']
+        df = df[df['label'].astype(str).str.strip() != '']
+        
+        if len(df) == 0:
+            raise ValueError("Dataset kosong setelah dibersihkan.")
+            
+        texts = df['text'].astype(str).tolist()
+        labels = df['label'].astype(str).tolist()
+        
+        # Preprocessing
+        training_status["message"] = f"Preprocessing {len(texts)} data (bisa lama)..."
+        training_status["progress"] = 30
+        
+        clean_texts = preprocessor.preprocess_batch(texts)
+        
+        training_status["message"] = "Melatih model Naive Bayes..."
+        training_status["progress"] = 80
+        
+        # Train
+        analyzer.train(clean_texts, labels)
+        
+        training_status["progress"] = 100
+        training_status["message"] = "Training selesai!"
+        training_status["result"] = {
+            "success": True,
+            "data_count": len(texts),
+            "message": f"Model berhasil dilatih dengan {len(texts)} data baris."
+        }
+        
+    except Exception as e:
+        print(f"Training Error: {e}")
+        training_status["progress"] = 0
+        training_status["message"] = f"Error: {str(e)}"
+        training_status["result"] = {"success": False, "error": str(e)}
+        
+    finally:
+        training_status["is_training"] = False
+
+
 @app.route('/train', methods=['POST'])
 def train():
+    if training_status["is_training"]:
+        return jsonify({"error": "Training sedang berjalan. Harap tunggu."}), 409
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     file = request.files['file']
@@ -33,51 +113,18 @@ def train():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
         
-        try:
-            # Read file (try CSV then Excel)
-            if filepath.endswith('.csv'):
-                df = pd.read_csv(filepath)
-            elif filepath.endswith('.xlsx'):
-                df = pd.read_excel(filepath)
-            else:
-                return jsonify({"error": "Format file tidak didukung. Gunakan CSV atau XLSX."}), 400
+        # Start background thread
+        thread = threading.Thread(target=run_training_background, args=(filepath, app.config['UPLOAD_FOLDER']))
+        thread.start()
+        
+        return jsonify({
+            "message": "Proses training dimulai di latar belakang.",
+            "status": "started"
+        })
 
-            # Validate columns
-            if 'text' not in df.columns or 'label' not in df.columns:
-                return jsonify({"error": "Dataset harus memiliki kolom 'text' dan 'label'."}), 400
-            
-            # Remove rows with empty labels or text
-            initial_count = len(df)
-            df = df.dropna(subset=['text', 'label'])
-            # Filter out empty strings or just whitespace
-            df = df[df['text'].astype(str).str.strip() != '']
-            df = df[df['label'].astype(str).str.strip() != '']
-            
-            cleaned_count = len(df)
-            if cleaned_count == 0:
-                return jsonify({"error": "Dataset tidak memiliki data valid (label tidak boleh kosong)."}), 400
-                
-            print(f"Dropped {initial_count - cleaned_count} invalid rows.")
-            
-            # Preprocessing
-            print("Preprocessing data for training...")
-            # Sample for quick response if dataset is huge, but we need full training
-            texts = df['text'].astype(str).tolist()
-            labels = df['label'].astype(str).tolist()
-            
-            clean_texts = preprocessor.preprocess_batch(texts)
-            
-            # Train
-            analyzer.train(clean_texts, labels)
-            
-            return jsonify({
-                "message": f"Model berhasil dilatih! ({initial_count - cleaned_count} data tidak valid dibuang)",
-                "data_count": len(texts),
-                "is_trained": True
-            })
-
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+@app.route('/train_status', methods=['GET'])
+def get_train_status():
+    return jsonify(training_status)
 
 @app.route('/analyze', methods=['POST'])
 def analyze():

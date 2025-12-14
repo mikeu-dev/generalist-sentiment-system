@@ -129,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loading.classList.remove('hidden');
         resultDiv.classList.add('hidden');
+        resultDiv.innerHTML = '';
 
         try {
             const response = await fetch('/train', {
@@ -139,22 +140,64 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (response.ok) {
-                resultDiv.innerHTML = `<div class="alert-success" style="color: green; margin-top: 10px;">${data.message} (${data.data_count} data)</div>`;
-                document.getElementById('model-status').textContent = "Siap Digunakan";
-                document.getElementById('model-status').className = "status-ready";
-                showToast(data.message, 'success');
+                // Check if started async
+                if (data.status === 'started') {
+                    showToast(data.message, 'info');
+                    pollTrainingStatus();
+                } else {
+                    // Fallback sync logic (if any)
+                    resultDiv.innerHTML = `<div class="alert-success" style="color: green; margin-top: 10px;">${data.message}</div>`;
+                    resultDiv.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                }
             } else {
                 resultDiv.innerHTML = `<div class="alert-error" style="color: red; margin-top: 10px;">Error: ${data.error}</div>`;
                 showToast('Training Gagal: ' + data.error, 'error');
+                resultDiv.classList.remove('hidden');
+                loading.classList.add('hidden');
             }
-            resultDiv.classList.remove('hidden');
         } catch (err) {
             showToast('Request failed: ' + err.message, 'error');
-        } finally {
             loading.classList.add('hidden');
         }
     });
 });
+
+function pollTrainingStatus() {
+    const loading = document.getElementById('train-loading');
+    const resultDiv = document.getElementById('train-result');
+    const statusText = loading; // We reuse the loading div text
+
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch('/train_status');
+            const status = await res.json();
+
+            if (status.is_training) {
+                statusText.textContent = `Sedang melatih model: ${status.message} (${status.progress}%)`;
+                loading.classList.remove('hidden');
+            } else {
+                clearInterval(interval);
+                loading.classList.add('hidden');
+
+                if (status.result && status.result.success) {
+                    resultDiv.innerHTML = `<div class="alert-success" style="color: green; margin-top: 10px;">${status.result.message}</div>`;
+                    document.getElementById('model-status').textContent = "Siap Digunakan";
+                    document.getElementById('model-status').className = "status-ready";
+                    showToast(status.result.message, 'success');
+                } else if (status.result && !status.result.success) {
+                    resultDiv.innerHTML = `<div class="alert-error" style="color: red; margin-top: 10px;">Error: ${status.result.error}</div>`;
+                    showToast('Training Gagal: ' + status.result.error, 'error');
+                }
+                resultDiv.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error("Polling error", e);
+            clearInterval(interval);
+            showToast("Gagal mengambil status training.", "error");
+        }
+    }, 1000);
+}
 
 let sentimentChart = null;
 let clusterChart = null;
