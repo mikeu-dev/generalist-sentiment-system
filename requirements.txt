@@ -1,0 +1,7 @@
+flask
+pandas
+scikit-learn
+sastrawi
+nltk
+matplotlib
+wordcloud

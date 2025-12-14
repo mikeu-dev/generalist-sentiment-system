@@ -1,0 +1,78 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.cluster import KMeans
+import pandas as pd
+import pickle
+import os
+
+class SentimentAnalyzer:
+    def __init__(self, model_path='model_data.pkl'):
+        self.vectorizer = TfidfVectorizer()
+        self.classifier = MultinomialNB()
+        self.kmeans = KMeans(n_clusters=3, random_state=42)
+        self.model_path = model_path
+        self.is_trained = False
+        self.load_model()
+
+    def train(self, texts, labels):
+        """
+        Melatih model Naive Bayes dengan data berlabel.
+        """
+        print("Training model...")
+        X = self.vectorizer.fit_transform(texts)
+        self.classifier.fit(X, labels)
+        self.is_trained = True
+        self.save_model()
+        print("Model trained and saved.")
+
+    def predict(self, texts):
+        """
+        Memprediksi sentimen ulasan.
+        """
+        if not self.is_trained:
+            raise Exception("Model belum dilatih. Silakan train model terlebih dahulu.")
+        
+        X = self.vectorizer.transform(texts)
+        return self.classifier.predict(X)
+
+    def cluster_topics(self, texts, n_clusters=3):
+        """
+        Mengelompokkan teks ke dalam topik menggunakan K-Means.
+        """
+        # Kita gunakan vectorizer yang sama agar fitur konsisten, 
+        # tapi idealnya clustering bisa punya vocabulary sendiri jika domain berubah drastis.
+        # Untuk generalist system, kita coba transform dulu.
+        if not hasattr(self.vectorizer, 'vocabulary_'):
+             # Jika belum fit, kita fit dulu dengan data ini (unsupervised mode partial)
+             X = self.vectorizer.fit_transform(texts)
+        else:
+            X = self.vectorizer.transform(texts)
+            
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        clusters = self.kmeans.fit_predict(X)
+        return clusters
+
+    def feature_extraction(self, texts):
+        if not hasattr(self.vectorizer, 'vocabulary_'):
+            return self.vectorizer.fit_transform(texts)
+        return self.vectorizer.transform(texts)
+
+    def save_model(self):
+        with open(self.model_path, 'wb') as f:
+            pickle.dump({
+                'vectorizer': self.vectorizer,
+                'classifier': self.classifier,
+                'is_trained': self.is_trained
+            }, f)
+
+    def load_model(self):
+        if os.path.exists(self.model_path):
+            try:
+                with open(self.model_path, 'rb') as f:
+                    data = pickle.load(f)
+                    self.vectorizer = data['vectorizer']
+                    self.classifier = data['classifier']
+                    self.is_trained = data.get('is_trained', False)
+                print("Model loaded successfully.")
+            except Exception as e:
+                print(f"Error loading model: {e}")

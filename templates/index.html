@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generalist Sentiment Analysis System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <h1>Sentiment & Opinion Mining System</h1>
+            <p>Analisis sentimen dan pengelompokan topik ulasan secara otomatis.</p>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <!-- Status Model -->
+        <div class="status-bar">
+            Status Model: 
+            <span id="model-status" class="{{ 'status-ready' if model_trained else 'status-not-ready' }}">
+                {{ 'Siap Digunakan' if model_trained else 'Belum Dilatih (Fitur Klasifikasi Non-Aktif)' }}
+            </span>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('analyze')">Analisis Data</button>
+            <button class="tab-btn" onclick="switchTab('train')">Training Model</button>
+        </div>
+
+        <!-- Analyze Section -->
+        <section id="analyze-section" class="tab-content active">
+            <div class="card">
+                <h2>Upload Data Ulasan</h2>
+                <p>Upload file CSV atau Excel berisi ulasan (harus ada kolom teks).</p>
+                <form id="analyze-form">
+                    <div class="file-drop-area">
+                        <span class="fake-btn">Pilih File</span>
+                        <span class="file-msg">atau drag and drop file di sini</span>
+                        <input class="file-input" type="file" name="file" accept=".csv, .xlsx" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Analisis Sekarang</button>
+                </form>
+                <div id="analyze-loading" class="loading hidden">Sedang menganalisis...</div>
+            </div>
+
+            <div id="results-container" class="hidden">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Total Ulasan</h3>
+                        <p id="total-reviews">-</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Sentimen Dominan</h3>
+                        <p id="dominant-sentiment">-</p>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Distribusi Sentimen</h3>
+                        <canvas id="sentimentChart"></canvas>
+                        <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih, sentimen tidak tersedia.</p>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Cluster Topik (K-Means)</h3>
+                        <canvas id="clusterChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Sampel Data & Prediksi</h3>
+                    <div class="table-responsive">
+                        <table id="result-table">
+                            <thead>
+                                <tr>
+                                    <th>Teks Ulasan</th>
+                                    <th>Prediksi Sentimen</th>
+                                    <th>Cluster</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Train Section -->
+        <section id="train-section" class="tab-content">
+            <div class="card">
+                <h2>Training Model Baru</h2>
+                <p>Upload dataset berlabel untuk melatih ulang model Naive Bayes.</p>
+                <div class="alert-info">
+                    Format wajib: Kolom <strong>text</strong> dan <strong>label</strong>.
+                </div>
+                <form id="train-form">
+                    <div class="file-drop-area">
+                        <span class="fake-btn">Pilih Dataset Training</span>
+                        <span class="file-msg">Format .csv atau .xlsx</span>
+                        <input class="file-input" type="file" name="file" accept=".csv, .xlsx" required>
+                    </div>
+                    <button type="submit" class="btn-secondary">Mulai Training</button>
+                </form>
+                <div id="train-loading" class="loading hidden">Sedang melatih model... (bisa memakan waktu)</div>
+                <div id="train-result" class="hidden"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Generalist Sentiment Analysis System</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
