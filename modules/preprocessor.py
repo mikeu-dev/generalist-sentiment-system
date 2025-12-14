@@ -11,24 +11,24 @@ logger = logging.getLogger(__name__)
 
 class TextPreprocessor:
     def __init__(self):
-        logger.info("Initializing Text Preprocessor...")
+        logger.info("Menginisialisasi Text Preprocessor...")
         self.stemmer_factory = StemmerFactory()
         self.stemmer = self.stemmer_factory.create_stemmer()
         
         self.stopword_factory = StopWordRemoverFactory()
         
-        # Customize Stopwords to exclude negations
+        # Kustomisasi Stopwords untuk mengecualikan kata negasi
         stopwords = self.stopword_factory.get_stop_words()
         excluded_stopwords = ['tidak', 'tak', 'bukan', 'jangan', 'kurang', 'belum', 'tidaklah']
         new_stopwords = [word for word in stopwords if word not in excluded_stopwords]
         
-        # Sastrawi doesn't allow easy removal, so we create a new dictionary
+        # Sastrawi tidak mengizinkan penghapusan mudah, jadi kita buat kamus baru
         from Sastrawi.StopWordRemover.StopWordRemover import StopWordRemover
         from Sastrawi.Dictionary.ArrayDictionary import ArrayDictionary
         
         dictionary = ArrayDictionary(new_stopwords)
         self.stopword_remover = StopWordRemover(dictionary)
-        logger.info("Text Preprocessor Initialized (Negations preserved).")
+        logger.info("Text Preprocessor Terinisialisasi (Negasi dipertahankan).")
 
     def clean_text(self, text: str) -> str:
         """
@@ -36,7 +36,7 @@ class TextPreprocessor:
         """
         if not isinstance(text, str):
             return ""
-        # Case folding
+        # Case folding (ubah ke huruf kecil)
         text = text.lower()
         # Hapus angka dan karakter non-alfabet
         text = re.sub(r'[^a-z\s]', '', text)
@@ -47,7 +47,7 @@ class TextPreprocessor:
     @lru_cache(maxsize=5000)
     def cached_stem(self, text: str) -> str:
         """
-        Wrapper cached untuk stemming.
+        Wrapper dengan fungsi cache untuk stemming.
         """
         return self.stemmer.stem(text)
 
@@ -57,13 +57,13 @@ class TextPreprocessor:
         """
         text = self.clean_text(text)
         
-        # Stopword removal
+        # Penghapusan Stopword
         text = self.stopword_remover.remove(text)
         
-        # Slang Normalization (New)
+        # Normalisasi Slang (Baru)
         text = self.normalize_slang(text)
         
-        # Stemming with cache
+        # Stemming dengan cache
         text = self.cached_stem(text)
         
         return text
@@ -81,7 +81,7 @@ class TextPreprocessor:
 
     def preprocess_batch(self, texts: List[str]) -> List[str]:
         """
-        Memproses list teks.
+        Memproses list teks dalam batch.
         """
         # Hapus cache jika terlalu besar untuk mencegah memory leak di long-running process
         # jika diperlukan, tapi maxsize=5000 cukup aman untuk aplikasi ini.

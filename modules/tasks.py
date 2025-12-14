@@ -6,22 +6,22 @@ from modules.training_state import TrainingStateManager
 from modules.preprocessor import TextPreprocessor
 from modules.analyzer import SentimentAnalyzer
 
-# Configure Logging (Worker needs its own config usually, or inherits)
+# Konfigurasi Logging (Worker biasanya butuh config sendiri atau inherit)
 logger = logging.getLogger(__name__)
 
 def run_training_background(filepath, app_config_upload_folder):
-    # Re-instantiate manager inside thread/process
-    # Pass Redis URL if needed, but defaults to localhost which is fine for now
+    # Instansiasi ulang manager di dalam thread/proses
+    # Oper URL Redis jika perlu, tapi default localhost sudah cukup
     manager = TrainingStateManager(upload_folder=app_config_upload_folder)
     
-    # Initialize modules fresh
+    # Inisialisasi modul baru
     preprocessor = TextPreprocessor()
     analyzer = SentimentAnalyzer()
     
     try:
         manager.start_training()
         
-        # Read file
+        # Baca file
         manager.update_status(progress=10, message="Membaca file dataset...")
         
         if filepath.endswith('.csv'):
@@ -35,11 +35,11 @@ def run_training_background(filepath, app_config_upload_folder):
         else:
             raise ValueError("Format file tidak didukung.")
 
-        # Validate columns
+        # Validasi kolom
         if 'text' not in df.columns or 'label' not in df.columns:
             raise ValueError("Dataset harus memiliki kolom 'text' dan 'label'.")
         
-        # Cleaning
+        # Pembersihan Data
         manager.update_status(progress=20, message="Membersihkan data...")
         df = df.dropna(subset=['text', 'label'])
         df = df[df['text'].astype(str).str.strip() != '']
@@ -58,7 +58,7 @@ def run_training_background(filepath, app_config_upload_folder):
         
         manager.update_status(progress=80, message="Melatih model Naive Bayes...")
         
-        # Train
+        # Latih Model
         metrics = analyzer.train(clean_texts, labels)
         
         result = {
@@ -70,5 +70,5 @@ def run_training_background(filepath, app_config_upload_folder):
         manager.finish_training(result)
         
     except Exception as e:
-        logger.error(f"Training Error: {e}")
+        logger.error(f"Eror Training: {e}")
         manager.error_training(str(e))

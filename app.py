@@ -13,19 +13,19 @@ from rq import Queue
 from redis import Redis
 from modules.tasks import run_training_background
 
-# Configure Logging
+# Konfigurasi Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 swagger = Swagger(app)
 
-# Redis Connection
+# Koneksi Redis
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 redis_conn = Redis.from_url(redis_url)
 queue = Queue(connection=redis_conn)
 
-# Load Config
+# Memuat Konfigurasi
 if os.environ.get('FLASK_ENV') == 'production':
     app.config.from_object(ProductionConfig)
 else:
@@ -36,34 +36,34 @@ with app.app_context():
     db.create_all()
 
 
-# Ensure upload directory exists
+# Pastikan direktori upload tersedia
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Initialize modules
-logger.info("Loading modules...")
+# Inisialisasi modul
+logger.info("Memuat modul...")
 preprocessor = TextPreprocessor()
 analyzer = SentimentAnalyzer()
-logger.info("Modules loaded.")
+logger.info("Modul berhasil dimuat.")
 
 @app.route('/')
 def index():
     return render_template('index.html', model_trained=analyzer.is_trained)
 
-# State Manager
+# Manajer Status Training
 from modules.training_state import TrainingStateManager
 
-# Initialize State Manager
+# Inisialisasi Manajer Status
 # Gunakan UPLOAD_FOLDER agar file persistent dan accessible
 state_manager = TrainingStateManager(upload_folder=app.config['UPLOAD_FOLDER'])
 
-# run_training_background moved to modules/tasks.py
+# run_training_background dipindahkan ke modules/tasks.py
 
 
 
 @app.route('/train', methods=['POST'])
 def train():
     """
-    Train a new Naive Bayes model.
+    Melatih model Naive Bayes baru.
     ---
     tags:
       - Training
@@ -74,34 +74,34 @@ def train():
         in: formData
         type: file
         required: true
-        description: Dataset with 'text' and 'label' columns.
+        description: Dataset dengan kolom 'text' dan 'label'.
     responses:
       200:
-        description: Training started successfully.
+        description: Proses training berhasil dimulai.
     """
     current_status = state_manager.get_status()
     if current_status["is_training"]:
         return jsonify({"error": "Training sedang berjalan. Harap tunggu."}), 409
 
     if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return jsonify({"error": "Tidak ada bagian file"}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "Tidak ada file yang dipilih"}), 400
     
-        if file:
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(filepath)
-            
-            # Start background job via RQ
-            job = queue.enqueue(run_training_background, filepath, app.config['UPLOAD_FOLDER'])
-            logger.info(f"Training job enqueued: {job.id}")
-            
-            return jsonify({
-                "message": "Proses training dimulai di latar belakang (Queue).",
-                "status": "started",
-                "job_id": job.id
-            })
+    if file:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(filepath)
+        
+        # Mulai pekerjaan di latar belakang via RQ
+        job = queue.enqueue(run_training_background, filepath, app.config['UPLOAD_FOLDER'])
+        logger.info(f"Training job antrean: {job.id}")
+        
+        return jsonify({
+            "message": "Proses training dimulai di latar belakang (Queue).",
+            "status": "started",
+            "job_id": job.id
+        })
 
 @app.route('/train_status', methods=['GET'])
 def get_train_status():
@@ -110,10 +110,10 @@ def get_train_status():
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """
-    Analyze sentiment of uploaded file.
+    Analisis sentimen dari file yang diunggah.
     ---
     tags:
-      - Analysis
+      - Analisis
     consumes:
       - multipart/form-data
     parameters:
@@ -121,30 +121,30 @@ def analyze():
         in: formData
         type: file
         required: true
-        description: CSV or Excel file containing 'text' column.
+        description: File CSV atau Excel yang berisi kolom teks.
       - name: model_type
         in: formData
         type: string
         enum: ['default', 'hf']
         default: 'default'
-        description: Choose 'default' (Naive Bayes) or 'hf' (Hugging Face / Deep Learning).
+        description: Pilih 'default' (Naive Bayes) atau 'hf' (Hugging Face / Deep Learning).
     responses:
       200:
-        description: Analysis results including distribution, clusters, and preview data.
+        description: Hasil analisis termasuk distribusi, klaster, dan pratinjau data.
       400:
-        description: Invalid input or file format.
+        description: Input tidak valid atau format file salah.
     """
     if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+        return jsonify({"error": "Tidak ada bagian file"}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "Tidak ada file yang dipilih"}), 400
     
     if file:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
         
-        # Check for model type
+        # Cek tipe model
         model_type = request.form.get('model_type', 'default')
         use_hf = (model_type == 'hf')
 
@@ -153,15 +153,15 @@ def analyze():
                 try:
                     df = pd.read_csv(filepath)
                 except Exception:
-                    # Fallback for parsing errors (e.g. quote mismatch)
-                    logger.warning("Standard CSV read failed, trying robust mode...")
+                    # Fallback untuk error parsing (misal: kesalahan tanda kutip)
+                    logger.warning("Pembacaan CSV standar gagal, mencoba mode robust...")
                     df = pd.read_csv(filepath, engine='python', on_bad_lines='skip', quotechar='"', encoding_errors='ignore')
             elif filepath.endswith('.xlsx'):
                 df = pd.read_excel(filepath)
             else:
                 return jsonify({"error": "Format file tidak didukung."}), 400
             
-            # Flexible column name for text
+            # Mendeteksi nama kolom teks secara fleksibel
             text_col = None
             for col in ['text', 'content', 'review', 'ulasan', 'komentar']:
                 if col in df.columns:
@@ -169,27 +169,26 @@ def analyze():
                     break
             
             if not text_col:
-                # If no known column, pick the first object/string column or just the first column
+                # Jika tidak ada kolom yang dikenal, pilih kolom objek/string pertama atau kolom paling awal
                 text_col = df.columns[0]
             
             raw_texts = df[text_col].astype(str).tolist()
             
-            logger.info("Preprocessing data for analysis...")
+            logger.info("Melakukan preprocessing data untuk analisis...")
             clean_texts = preprocessor.preprocess_batch(raw_texts)
             
             results = {"total": len(raw_texts), "distribution": {}, "clusters": []}
             
-            # Sentiment Prediction
-            # Sentiment Prediction & Clustering
-            # We use predict_detailed to get full info
-            logger.info(f"Predicting sentiment detailed... Use HF: {use_hf}")
+            # Prediksi Sentimen & Clustering
+            # Kita gunakan predict_detailed untuk mendapatkan info lengkap
+            logger.info(f"Memprediksi sentimen secara detail... Gunakan HF: {use_hf}")
             details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
             
-            # Clustering
-            logger.info("Clustering topics...")
+            # Clustering Topik
+            logger.info("Mengelompokkan topik (Clustering)...")
             clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
             
-            # Save to DB and prepare response
+            # Simpan ke DB dan siapkan respons
             preview_data = []
             distribution = {}
             
@@ -197,7 +196,7 @@ def analyze():
                 detail = details[i]
                 cluster_id = int(clusters[i]) if i < len(clusters) else 0
                 
-                # DB Log
+                # Log Database
                 log = SentimentLog(
                     text=text,
                     label=detail['label'],
@@ -210,7 +209,7 @@ def analyze():
                 )
                 db.session.add(log)
                 
-                # Response Data
+                # Data Respons
                 if i < 100:
                     preview_data.append({
                         "text": text,
@@ -218,17 +217,17 @@ def analyze():
                         "cluster": cluster_id,
                         "score": detail['sentiment_score'],
                         "source": file.filename,
-                        "title": "File Upload",
+                        "title": "Unggah File",
                         "preprocessed": clean_texts[i]
                     })
                 
-                # Distribution stats
+                # Statistik Distribusi
                 lbl = detail['label']
                 distribution[lbl] = distribution.get(lbl, 0) + 1
             
             db.session.commit()
             
-            # Cluster stats
+            # Statistik Klaster
             cluster_counts = {}
             for c in clusters:
                 c_int = int(c)
@@ -243,27 +242,27 @@ def analyze():
             }
             
             if not analyzer.is_trained and details and details[0]['model_version'] == 'lexicon_rule_based':
-                 results['warning'] = "Model belum dilatih. Menggunakan Rule-based lexicon."
+                 results['warning'] = "Model belum dilatih. Menggunakan pendekatan berbasis aturan (Lexicon)."
 
             return jsonify(results)
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Analysis Error: {e}")
+            logger.error(f"Eror Analisis: {e}")
             return jsonify({"error": str(e)}), 500
 
 from modules.dataset_finder import DatasetFinder
 
-# Initialize DatasetFinder
+# Inisialisasi DatasetFinder
 dataset_finder = DatasetFinder()
 
 @app.route('/search_and_analyze', methods=['POST'])
 def search_and_analyze():
     """
-    Search web and analyze sentiment of results.
+    Mencari data dari web dan menganalisis sentimen hasilnya.
     ---
     tags:
-      - Analysis
+      - Analisis
     parameters:
       - name: body
         in: body
@@ -279,18 +278,18 @@ def search_and_analyze():
               enum: ['default', 'hf']
     responses:
       200:
-        description: Search results and sentiment analysis.
+        description: Hasil pencarian dan analisis sentimen.
     """
     data = request.json
     if not data or 'query' not in data:
-        return jsonify({"error": "Query required"}), 400
+        return jsonify({"error": "Query diperlukan"}), 400
     
     query = data['query']
-    logger.info(f"Received search query: {query}")
+    logger.info(f"Menerima query pencarian: {query}")
     
     try:
-        # 1. Search
-        logger.info("Searching web...")
+        # 1. Pencarian
+        logger.info("Mencari di web...")
         limit = int(data.get('limit', 100))
         raw_texts = dataset_finder.search(query, max_results=limit)
         
@@ -300,9 +299,9 @@ def search_and_analyze():
         if not raw_texts:
             return jsonify({"error": "Tidak ada data ditemukan untuk topik tersebut."}), 404
             
-        # 2. Preprocess
-        logger.info("Preprocessing search results...")
-        # raw_texts is now a list of dicts: [{'text':..., 'source':..., 'title':...}]
+        # 2. Preprocessing
+        logger.info("Preprocessing hasil pencarian...")
+        # raw_texts kini berupa list of dicts: [{'text':..., 'source':..., 'title':...}]
         texts_only = [r['text'] for r in raw_texts]
         clean_texts = preprocessor.preprocess_batch(texts_only)
         
@@ -313,9 +312,8 @@ def search_and_analyze():
             "clusters": []
         }
         
-        # 3. Predict Sentiment (using existing model or lexicon)
-        # Always try to predict (analyzer now handles fallback)
-        # 3. Predict & Cluster & Save
+        # 3. Prediksi Sentimen (menggunakan model atau lexicon)
+        # 3. Prediksi & Klaster & Simpan
         details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
         clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
         
@@ -326,12 +324,12 @@ def search_and_analyze():
         for i, item in enumerate(raw_texts):
             text = item['text']
             source = item['source']
-            title = item.get('title', 'No Title')
+            title = item.get('title', 'Tanpa Judul')
             
             detail = details[i]
             cluster_id = int(clusters[i]) if i < len(clusters) else 0
             
-            # DB Log
+            # Log Database
             log = SentimentLog(
                 text=text,
                 label=detail['label'],
@@ -344,7 +342,7 @@ def search_and_analyze():
             )
             db.session.add(log)
             
-            # Response Data
+            # Data Respons
             if i < 100:
                 preview_data.append({
                     "text": text,
@@ -355,7 +353,7 @@ def search_and_analyze():
                     "preprocessed": clean_texts[i]
                 })
             
-            # Stats
+            # Statistik
             lbl = detail['label']
             distribution[lbl] = distribution.get(lbl, 0) + 1
             cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
@@ -370,7 +368,7 @@ def search_and_analyze():
         return jsonify(results)
 
     except Exception as e:
-        logger.error(f"Search and Analyze Error: {e}", exc_info=True)
+        logger.error(f"Eror Search dan Analyze: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

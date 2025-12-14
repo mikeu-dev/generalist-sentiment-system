@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
     def __init__(self, model_dir: str = 'models'):
-        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2)) # Capture bigrams
-        # LinearSVC is generally better for text, CalibratedClassifierCV allows predict_proba
+        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2)) # Menangkap bigram
+        # LinearSVC umumnya lebih baik untuk teks, CalibratedClassifierCV memungkinkan predict_proba
         svc = LinearSVC(random_state=42)
         self.classifier = CalibratedClassifierCV(svc) 
         self.kmeans = KMeans(n_clusters=3, random_state=42)
         self.model_dir = model_dir
         
-        # Ensure model directory exists
+        # Pastikan direktori model ada
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
             
@@ -40,16 +40,16 @@ class SentimentAnalyzer:
 
     def init_hf_model(self, model_name="w11wo/indonesian-roberta-base-sentiment-classifier"):
         if not HF_AVAILABLE:
-            logger.warning("Transformers library not installed. Cannot load HF model.")
+            logger.warning("Library Transformers tidak terinstal. Tidak dapat memuat model HF.")
             return False
             
         try:
-            logger.info(f"Loading Hugging Face model: {model_name}")
+            logger.info(f"Memuat model Hugging Face: {model_name}")
             self.hf_classifier = pipeline("sentiment-analysis", model=model_name, tokenizer=model_name)
-            logger.info("Hugging Face model loaded successfully.")
+            logger.info("Model Hugging Face berhasil dimuat.")
             return True
         except Exception as e:
-            logger.error(f"Failed to load HF model: {e}")
+            logger.error(f"Gagal memuat model HF: {e}")
             return False
 
     def train(self, texts: List[str], labels: List[str]) -> Dict[str, Any]:
@@ -57,7 +57,7 @@ class SentimentAnalyzer:
         Melatih model dengan GridSearchCV untuk mencari hyperparameter optimal.
         Melakukan evaluasi menggunakan train_test_split sebelum training final.
         """
-        logger.info(f"Training model with {len(texts)} data points...")
+        logger.info(f"Melatih model dengan {len(texts)} data points...")
         
         metrics = {}
         
@@ -68,18 +68,18 @@ class SentimentAnalyzer:
             
             X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42, stratify=labels)
             
-            # Vectorize Train
+            # Vektorisasi Train
             X_train_vec = self.vectorizer.fit_transform(X_train)
             X_test_vec = self.vectorizer.transform(X_test)
 
-            # Define Parameter Grid
+            # Definisi Grid Parameter
             param_grid = {
                 'C': [0.01, 0.1, 1, 10],
                 'class_weight': [None, 'balanced']
             }
             
             # 2. Grid Search pada Training Set
-            logger.info("Starting GridSearchCV for hyperparameter tuning...")
+            logger.info("Memulai GridSearchCV untuk hyperparameter tuning...")
             grid = GridSearchCV(
                 LinearSVC(random_state=42, max_iter=2000), 
                 param_grid, 
@@ -100,10 +100,10 @@ class SentimentAnalyzer:
             metrics['classes'] = grid.classes_.tolist()
             metrics['best_params'] = grid.best_params_
             
-            logger.info(f"Evaluation Metrics: Accuracy={metrics['accuracy']:.4f}")
+            logger.info(f"Metrik Evaluasi: Accuracy={metrics['accuracy']:.4f}")
 
             # 4. Retrain pada Full Dataset untuk Production
-            logger.info("Retraining on full dataset...")
+            logger.info("Melatih ulang pada dataset penuh...")
             X_full = self.vectorizer.fit_transform(texts)
             
             # Gunakan best params dari phase sebelumnya
@@ -114,33 +114,33 @@ class SentimentAnalyzer:
                 class_weight=grid.best_params_['class_weight']
             )
             
-            # Wrap in CalibratedClassifierCV
+            # Bungkus dalam CalibratedClassifierCV
             self.classifier = CalibratedClassifierCV(final_model, cv=5)
             self.classifier.fit(X_full, labels)
             
             self.is_trained = True
             self.current_model_version = f"v1.1.0_tuned_{grid.best_params_['C']}"
             self.save_model()
-            logger.info("Model tuned, evaluated, retrained, and saved.")
+            logger.info("Model disetel, dievaluasi, dilatih ulang, dan disimpan.")
             
             return metrics
             
         except Exception as e:
-            logger.error(f"Error during training: {e}")
+            logger.error(f"Eror saat training: {e}")
             raise
 
     def predict(self, texts: List[str]) -> List[str]:
         """
-        Legacy wrapper for predict_detailed to return only labels.
+        Wrapper legacy untuk predict_detailed yang hanya mengembalikan label.
         """
         details = self.predict_detailed(texts)
         return [d['label'] for d in details]
 
     def predict_detailed(self, texts: List[str], use_hf: bool = False) -> List[Dict[str, Any]]:
         """
-        Returns detailed prediction with confidence and scores.
+        Mengembalikan prediksi detail dengan confidence dan skor sentimen.
         """
-        logger.debug(f"predict_detailed called. is_trained={self.is_trained}, use_hf={use_hf}")
+        logger.debug(f"predict_detailed dipanggil. is_trained={self.is_trained}, use_hf={use_hf}")
         
         if use_hf:
             return self.predict_detailed_hf(texts)
@@ -151,33 +151,33 @@ class SentimentAnalyzer:
         results = []
 
         if self.is_trained:
-            # Machine Learning Prediction
+            # Prediksi Machine Learning
             try:
                 X = self.vectorizer.transform(texts)
-                # Ensure classifier has predict_proba
+                # Pastikan classifier memiliki predict_proba
                 if hasattr(self.classifier, "predict_proba"):
                     probs = self.classifier.predict_proba(X)
                     classes = self.classifier.classes_
                     
-                    # Map classes to index
-                    # Assuming classes are 'positif', 'negatif', 'netral'
-                    # We need to handle dynamic classes
+                    # Petakan kelas ke indeks
+                    # Asumsi kelas adalah 'positif', 'negatif', 'netral'
+                    # Kita perlu menangani kelas dinamis
                     
                     for i, prob_dist in enumerate(probs):
-                        # Get max prob class
+                        # Dapatkan kelas dengan probabilitas tertinggi
                         max_idx = prob_dist.argmax()
                         label = classes[max_idx]
                         confidence = float(prob_dist[max_idx])
                         
-                        # Calculate Score (-1 to 1)
-                        # We try to find indexes for pos/neg
+                        # Hitung Skor (-1 ke 1)
+                        # Kita coba cari indeks untuk pos/neg
                         score = 0.0
                         
-                        # Safe lookup
+                        # Pencarian aman
                         pos_idx = -1
                         neg_idx = -1
                         
-                        # Case insensitive lookup
+                        # Pencarian case insensitive
                         for idx, cls_name in enumerate(classes):
                             if 'positif' in str(cls_name).lower():
                                 pos_idx = idx
@@ -198,7 +198,7 @@ class SentimentAnalyzer:
                             "model_version": self.current_model_version
                         })
                 else:
-                    # Fallback if no proba
+                    # Fallback jika tidak ada proba
                     preds = self.classifier.predict(X)
                     for p in preds:
                         results.append({
@@ -209,8 +209,8 @@ class SentimentAnalyzer:
                         })
 
             except Exception as e:
-                logger.error(f"ML Prediction Error: {e}")
-                # Fallback to Netral
+                logger.error(f"Eror Prediksi ML: {e}")
+                # Fallback ke Netral
                 for _ in texts:
                     results.append({
                         "label": "netral",
@@ -219,8 +219,8 @@ class SentimentAnalyzer:
                         "model_version": "error_fallback"
                     })
         else:
-            # Fallback: Rule-based Prediction
-            logger.debug("Using Lexicon Fallback.")
+            # Fallback: Prediksi Berbasis Aturan (Lexicon)
+            logger.debug("Menggunakan Fallback Lexicon.")
             for text in texts:
                 score = 0
                 words = text.split()
@@ -231,9 +231,9 @@ class SentimentAnalyzer:
                         score -= 1
                 
                 label = "netral"
-                # Lexicon score logic
-                norm_score = 0.0 # Normalize roughly? 
-                # Let's just clamp -1 to 1
+                # Logika skor Lexicon
+                norm_score = 0.0 # Normalisasi kasar?
+                # Mari kita batasi -1 hingga 1
                 if score > 0:
                     label = "positif"
                     norm_score = min(1.0, score * 0.2)
@@ -243,7 +243,7 @@ class SentimentAnalyzer:
                 
                 results.append({
                     "label": label,
-                    "confidence_score": 0.5, # Rule based, unsure
+                    "confidence_score": 0.5, # Berbasis aturan, tidak yakin
                     "sentiment_score": float(norm_score),
                     "model_version": "lexicon_rule_based"
                 })
@@ -252,37 +252,37 @@ class SentimentAnalyzer:
 
     def predict_detailed_hf(self, texts: List[str]) -> List[Dict[str, Any]]:
         """
-        Predict utilizing Hugging Face Pipeline with robust error handling and flexible label mapping.
+        Prediksi menggunakan Hugging Face Pipeline dengan penanganan error yang kuat dan pemetaan label yang fleksibel.
         """
         # Lazy load model
         if not self.hf_classifier:
              if not self.init_hf_model():
-                 # Fallback to standard if init fails
-                 logger.warning("HF Init failed, falling back to standard.")
+                 # Fallback ke standar jika init gagal
+                 logger.warning("Init HF gagal, fallback ke standar.")
                  return self.predict_detailed(texts, use_hf=False)
         
         results = []
         try:
-            # Pipeline handling for batch processing
-            # Truncation is important for some models (max 512 tokens usually)
+            # Penanganan Pipeline untuk pemrosesan batch
+            # Pemotongan (Truncation) penting untuk beberapa model (biasanya maks 512 token)
             predictions = self.hf_classifier(texts, truncation=True, max_length=512)
             
             for i, pred in enumerate(predictions):
-                # pred format can be {'label': '...', 'score': ...}
+                # format pred bisa berupa {'label': '...', 'score': ...}
                 label_raw = pred['label']
                 confidence = pred['score']
                 
-                # Normalize Label to standard 'positif', 'negatif', 'netral'
+                # Normalisasi Label ke standar 'positif', 'negatif', 'netral'
                 label = 'netral'
                 score = 0.0
                 
-                # Dynamic mapping based on common HF specific outputs
-                # Many indo models use 'positive', 'negative', 'neutral' or label mappings
-                # We normalize to lowercase for check
+                # Pemetaan dinamis berdasarkan output spesifik HF umum
+                # Banyak model indo menggunakan 'positive', 'negative', 'neutral' atau pemetaan label
+                # Kita normalisasi ke huruf kecil untuk pemeriksaan
                 lbl_lower = label_raw.lower()
 
-                if 'pos' in lbl_lower or 'label_0' in lbl_lower: # Label 0 often positive in some indonesian models, check specific model card if unsure. Actually w11wo/indonesian-roberta-base-sentiment-classifier: 0=positive, 1=neutral, 2=negative.
-                     # Wait, let's verify w11wo model mapping:
+                if 'pos' in lbl_lower or 'label_0' in lbl_lower: # Label 0 seringkali positif di beberapa model, cek model card jika ragu. Sebenarnya w11wo/indonesian-roberta-base-sentiment-classifier: 0=positive, 1=neutral, 2=negative.
+                     # Mari verifikasi pemetaan model w11wo:
                      # id2label: {0: "positive", 1: "neutral", 2: "negative"}
                      label = 'positif'
                      score = confidence
@@ -301,8 +301,8 @@ class SentimentAnalyzer:
                 })
                 
         except Exception as e:
-            logger.error(f"HF Prediction Error: {e}")
-            # Fallback to standard model for the whole batch if critical failure
+            logger.error(f"Eror Prediksi HF: {e}")
+            # Fallback ke model standar untuk seluruh batch jika terjadi kegagalan kritis
             return self.predict_detailed(texts, use_hf=False)
             
         return results
@@ -319,33 +319,33 @@ class SentimentAnalyzer:
         if hasattr(self.vectorizer, 'vocabulary_') and self.is_trained:
              # Transform menggunakan vocabulary yang sudah ada
              try:
-                 logger.debug("Clustering using trained vectorizer.")
+                 logger.debug("Clustering menggunakan vectorizer terlatih.")
                  X = self.vectorizer.transform(texts)
              except Exception as e:
-                 logger.warning(f"Vectorizer transform failed: {e}. Fitting temporary one.")
+                 logger.warning(f"Transform vectorizer gagal: {e}. Fitting yang sementara.")
                  try:
                      temp_vectorizer = TfidfVectorizer()
                      X = temp_vectorizer.fit_transform(texts)
                  except ValueError:
-                     logger.warning("Clustering fallback failed: Empty vocabulary, returning cluster 0.")
+                     logger.warning("Fallback clustering gagal: Vocabulary kosong, mengembalikan cluster 0.")
                      return [0] * len(texts)
         else:
              # Jika belum fit sama sekali (belum ada model), kita fit dengan data ini
              # Tapi jangan simpan ke self.vectorizer agar tidak merusak training masa depan
              # Gunakan temporary vectorizer
              try:
-                 logger.debug("Clustering using temporary vectorizer (Model not trained).")
+                 logger.debug("Clustering menggunakan vectorizer sementara (Model belum dilatih).")
                  temp_vectorizer = TfidfVectorizer()
                  X = temp_vectorizer.fit_transform(texts)
              except ValueError:
-                 logger.warning("Clustering failed: Empty vocabulary (texts might be empty or stopwords only). Returning cluster 0.")
+                 logger.warning("Clustering gagal: Vocabulary kosong (teks mungkin kosong atau stopwords saja). Mengembalikan cluster 0.")
                  return [0] * len(texts)
             
-        # Ensure distinct clusters if N > samples
+        # Pastikan cluster berbeda jika N > sampel
         n_samples = X.shape[0]
         actual_k = min(n_clusters, n_samples)
         if actual_k < 2:
-             # Too few samples to cluster meaningfully, return all 0
+             # Terlalu sedikit sampel untuk di-cluster secara bermakna, kembalikan semua 0
              return [0] * n_samples
 
         kmeans_local = KMeans(n_clusters=actual_k, random_state=42)
@@ -364,35 +364,35 @@ class SentimentAnalyzer:
                     'classifier': self.classifier,
                     'is_trained': self.is_trained
                 }, f)
-            logger.info(f"Model saved to {filepath}")
+            logger.info(f"Model disimpan ke {filepath}")
         except Exception as e:
-            logger.error(f"Failed to save model: {e}")
+            logger.error(f"Gagal menyimpan model: {e}")
 
     def load_model(self) -> None:
-        # Find latest model
+        # Cari model terbaru
         pattern = os.path.join(self.model_dir, "model_*.pkl")
         files = glob.glob(pattern)
         
         if not files:
-            # Check for legacy model in root
+            # Cek model legacy di root
             if os.path.exists('model_sentiment.pkl'):
-                 logger.info("Found legacy model_sentiment.pkl, loading...")
+                 logger.info("Menemukan legacy model_sentiment.pkl, memuat...")
                  try:
                     with open('model_sentiment.pkl', 'rb') as f:
                         data = pickle.load(f)
                         self.vectorizer = data['vectorizer']
                         self.classifier = data['classifier']
                         self.is_trained = data.get('is_trained', False)
-                    logger.info("Legacy Model loaded.")
+                    logger.info("Model Legacy dimuat.")
                  except Exception as e:
-                    logger.error(f"Error loading legacy model: {e}")
+                    logger.error(f"Eror memuat model legacy: {e}")
             else:
-                 logger.info("No model found. Starting fresh.")
+                 logger.info("Tidak ada model ditemukan. Memulai dari awal.")
             return
 
-        # Sort by modification time
+        # Urutkan berdasarkan waktu modifikasi
         latest_file = max(files, key=os.path.getmtime)
-        logger.info(f"Loading latest model: {latest_file}")
+        logger.info(f"Memuat model terbaru: {latest_file}")
         
         try:
             with open(latest_file, 'rb') as f:
@@ -401,6 +401,6 @@ class SentimentAnalyzer:
                 self.classifier = data['classifier']
                 self.is_trained = data.get('is_trained', False)
                 self.current_model_version = os.path.basename(latest_file)
-            logger.info("Model loaded successfully.")
+            logger.info("Model berhasil dimuat.")
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error(f"Eror memuat model: {e}")
