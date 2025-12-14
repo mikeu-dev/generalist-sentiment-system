@@ -40,6 +40,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Search Form Handler
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const query = form.querySelector('input[name="query"]').value;
+        const loading = document.getElementById('search-loading');
+        const resultsContainer = document.getElementById('results-container');
+
+        loading.classList.remove('hidden');
+        resultsContainer.classList.add('hidden');
+
+        try {
+            const response = await fetch('/search_and_analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                renderResults(data);
+                resultsContainer.classList.remove('hidden');
+                // Scroll to results
+                resultsContainer.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Request failed: ' + err.message);
+        } finally {
+            loading.classList.add('hidden');
+        }
+    });
+
     // Train Form Handler
     document.getElementById('train-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -172,8 +209,11 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
 
     document.getElementById(`${tabName}-section`).classList.add('active');
+
     // Find button
     const btns = document.querySelectorAll('.tab-btn');
+    // 0: Analyze (Upload), 1: Search, 2: Train
     if (tabName === 'analyze') btns[0].classList.add('active');
-    else btns[1].classList.add('active');
+    else if (tabName === 'search') btns[1].classList.add('active');
+    else if (tabName === 'train') btns[2].classList.add('active');
 }

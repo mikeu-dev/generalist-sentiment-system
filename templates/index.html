@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
 
     <header>
@@ -18,10 +20,10 @@
     </header>
 
     <main class="container">
-        
+
         <!-- Status Model -->
         <div class="status-bar">
-            Status Model: 
+            Status Model:
             <span id="model-status" class="{{ 'status-ready' if model_trained else 'status-not-ready' }}">
                 {{ 'Siap Digunakan' if model_trained else 'Belum Dilatih (Fitur Klasifikasi Non-Aktif)' }}
             </span>
@@ -29,9 +31,28 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('analyze')">Analisis Data</button>
+            <button class="tab-btn active" onclick="switchTab('analyze')">Upload File</button>
+            <button class="tab-btn" onclick="switchTab('search')">Cari Dataset (Baru)</button>
             <button class="tab-btn" onclick="switchTab('train')">Training Model</button>
         </div>
+
+        <!-- Search Section -->
+        <section id="search-section" class="tab-content">
+            <div class="card">
+                <h2>Cari Dataset & Analisis Otomatis</h2>
+                <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15", "Pilpres") untuk mencari data dari internet dan
+                    menganalisis sentimennya.</p>
+                <form id="search-form">
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" name="query" placeholder="Ketik topik di sini..." required
+                            style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;">
+                    </div>
+                    <button type="submit" class="btn-primary">Cari & Analisis</button>
+                </form>
+                <div id="search-loading" class="loading hidden">Sedang mencari data dari internet dan menganalisis...
+                </div>
+            </div>
+        </section>
 
         <!-- Analyze Section -->
         <section id="analyze-section" class="tab-content active">
@@ -65,7 +86,8 @@
                     <div class="chart-card">
                         <h3>Distribusi Sentimen</h3>
                         <canvas id="sentimentChart"></canvas>
-                        <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih, sentimen tidak tersedia.</p>
+                        <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih, sentimen tidak
+                            tersedia.</p>
                     </div>
                     <div class="chart-card">
                         <h3>Cluster Topik (K-Means)</h3>
@@ -122,4 +144,5 @@
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>
