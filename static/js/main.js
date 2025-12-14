@@ -212,7 +212,7 @@ document.getElementById('download-btn').addEventListener('click', () => {
     }
 
     const rows = [
-        ["Text", "Sentiment", "Cluster"] // Header
+        ["text", "label", "cluster"] // Header matches training requirements
     ];
 
     lastResultData.data.forEach(item => {
