@@ -69,6 +69,23 @@
                 <h2><i class="ph ph-file-text"></i> Upload Data Ulasan</h2>
                 <p>Upload file CSV atau Excel yang berisi kolom ulasan untuk dianalisis.</p>
                 <form id="analyze-form">
+                    <!-- Model Selection -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Pilih Model:</label>
+                        <div class="radio-group" style="display: flex; gap: 1rem;">
+                            <label class="radio-card selected" onclick="selectModel(this, 'default')">
+                                <input type="radio" name="model_type" value="default" checked hidden>
+                                <span class="radio-title"><i class="ph ph-lightning"></i> Cepat (Naive Bayes)</span>
+                                <span class="radio-desc">Optimasi kecepatan, baik untuk dataset besar.</span>
+                            </label>
+                            <label class="radio-card" onclick="selectModel(this, 'hf')">
+                                <input type="radio" name="model_type" value="hf" hidden>
+                                <span class="radio-title"><i class="ph ph-brain"></i> Akurat (Deep Learning)</span>
+                                <span class="radio-desc">Menggunakan Transformers. Lebih lambat tapi lebih cerdas.</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="file-drop-area">
                         <i class="ph ph-file-arrow-up file-icon"></i>
                         <span class="fake-btn">Pilih File</span>

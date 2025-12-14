@@ -3,21 +3,43 @@ import os
 import time
 import fcntl
 from datetime import datetime
+import redis
 
 class TrainingStateManager:
-    def __init__(self, state_file='training_state.json', upload_folder='uploads'):
+    def __init__(self, state_file='training_state.json', upload_folder='uploads', redis_url='redis://localhost:6379/0'):
         self.state_file = os.path.join(upload_folder, state_file)
-        # Ensure initial state exists if not present
-        if not os.path.exists(self.state_file):
+        self.redis_client = None
+        
+        # Try connecting to Redis
+        try:
+            self.redis_client = redis.from_url(redis_url)
+            self.redis_client.ping()
+        except Exception as e:
+            print(f"Redis not available, falling back to file: {e}")
+            self.redis_client = None
+
+        # Ensure initial state exists
+        if not self.get_status():
             self.reset_state()
 
+    def _get_redis_key(self):
+        return "training_state"
+
     def _load_state(self):
+        if self.redis_client:
+            try:
+                data = self.redis_client.get(self._get_redis_key())
+                if data:
+                    return json.loads(data)
+            except Exception as e:
+                print(f"Redis load error: {e}")
+        
+        # File fallback
         try:
             if not os.path.exists(self.state_file):
-                return self.reset_state()
+                return None # Signal to reset
             
             with open(self.state_file, 'r') as f:
-                # Simple shared lock for reading
                 fcntl.flock(f, fcntl.LOCK_SH)
                 try:
                     data = json.load(f)
@@ -25,14 +47,20 @@ class TrainingStateManager:
                     fcntl.flock(f, fcntl.LOCK_UN)
             return data
         except Exception as e:
-            # Fallback if file is corrupt
             print(f"Error loading state: {e}")
-            return self.reset_state()
+            return None
 
     def _save_state(self, state):
+        if self.redis_client:
+            try:
+                self.redis_client.set(self._get_redis_key(), json.dumps(state))
+                # Also save to file for persistence/debug backup
+            except Exception as e:
+                print(f"Redis save error: {e}")
+
+        # Always save to file as backup/fallback
         try:
             with open(self.state_file, 'w') as f:
-                # Exclusive lock for writing
                 fcntl.flock(f, fcntl.LOCK_EX)
                 try:
                     json.dump(state, f)
@@ -55,10 +83,13 @@ class TrainingStateManager:
         return state
 
     def get_status(self):
-        return self._load_state()
+        state = self._load_state()
+        if state is None:
+            return self.reset_state()
+        return state
 
     def update_status(self, progress=None, message=None, is_training=None, result=None):
-        state = self._load_state()
+        state = self.get_status()
         
         if progress is not None:
             state['progress'] = progress

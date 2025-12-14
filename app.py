@@ -8,13 +8,22 @@ from config import DevelopmentConfig, ProductionConfig
 from modules.preprocessor import TextPreprocessor
 from modules.analyzer import SentimentAnalyzer
 from models.sentiment_log import db, SentimentLog
-
+from flasgger import Swagger
+from rq import Queue
+from redis import Redis
+from modules.tasks import run_training_background
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+swagger = Swagger(app)
+
+# Redis Connection
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+redis_conn = Redis.from_url(redis_url)
+queue = Queue(connection=redis_conn)
 
 # Load Config
 if os.environ.get('FLASK_ENV') == 'production':
@@ -47,65 +56,29 @@ from modules.training_state import TrainingStateManager
 # Gunakan UPLOAD_FOLDER agar file persistent dan accessible
 state_manager = TrainingStateManager(upload_folder=app.config['UPLOAD_FOLDER'])
 
-def run_training_background(filepath, app_config_upload_folder):
-    # Re-instantiate manager inside thread to ensure clean state handle if needed, 
-    # though file locking handles concurrency.
-    manager = TrainingStateManager(upload_folder=app_config_upload_folder)
-    
-    try:
-        manager.start_training()
-        
-        # Read file
-        manager.update_status(progress=10, message="Membaca file dataset...")
-        
-        if filepath.endswith('.csv'):
-            df = pd.read_csv(filepath)
-        elif filepath.endswith('.xlsx'):
-            df = pd.read_excel(filepath)
-        else:
-            raise ValueError("Format file tidak didukung.")
-
-        # Validate columns
-        if 'text' not in df.columns or 'label' not in df.columns:
-            raise ValueError("Dataset harus memiliki kolom 'text' dan 'label'.")
-        
-        # Cleaning
-        manager.update_status(progress=20, message="Membersihkan data...")
-        df = df.dropna(subset=['text', 'label'])
-        df = df[df['text'].astype(str).str.strip() != '']
-        df = df[df['label'].astype(str).str.strip() != '']
-        
-        if len(df) == 0:
-            raise ValueError("Dataset kosong setelah dibersihkan.")
-            
-        texts = df['text'].astype(str).tolist()
-        labels = df['label'].astype(str).tolist()
-        
-        # Preprocessing
-        manager.update_status(progress=30, message=f"Preprocessing {len(texts)} data (bisa lama)...")
-        
-        clean_texts = preprocessor.preprocess_batch(texts)
-        
-        manager.update_status(progress=80, message="Melatih model Naive Bayes...")
-        
-        # Train
-        analyzer.train(clean_texts, labels)
-        
-        result = {
-            "success": True,
-            "data_count": len(texts),
-            "message": f"Model berhasil dilatih dengan {len(texts)} data baris."
-        }
-        manager.finish_training(result)
-        
-    except Exception as e:
-        logger.error(f"Training Error: {e}")
-        manager.error_training(str(e))
+# run_training_background moved to modules/tasks.py
 
 
 
 @app.route('/train', methods=['POST'])
 def train():
+    """
+    Train a new Naive Bayes model.
+    ---
+    tags:
+      - Training
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: Dataset with 'text' and 'label' columns.
+    responses:
+      200:
+        description: Training started successfully.
+    """
     current_status = state_manager.get_status()
     if current_status["is_training"]:
         return jsonify({"error": "Training sedang berjalan. Harap tunggu."}), 409
@@ -116,18 +89,19 @@ def train():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     
-    if file:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        file.save(filepath)
-        
-        # Start background thread
-        thread = threading.Thread(target=run_training_background, args=(filepath, app.config['UPLOAD_FOLDER']))
-        thread.start()
-        
-        return jsonify({
-            "message": "Proses training dimulai di latar belakang.",
-            "status": "started"
-        })
+        if file:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(filepath)
+            
+            # Start background job via RQ
+            job = queue.enqueue(run_training_background, filepath, app.config['UPLOAD_FOLDER'])
+            logger.info(f"Training job enqueued: {job.id}")
+            
+            return jsonify({
+                "message": "Proses training dimulai di latar belakang (Queue).",
+                "status": "started",
+                "job_id": job.id
+            })
 
 @app.route('/train_status', methods=['GET'])
 def get_train_status():
@@ -135,6 +109,31 @@ def get_train_status():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
+    """
+    Analyze sentiment of uploaded file.
+    ---
+    tags:
+      - Analysis
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: file
+        in: formData
+        type: file
+        required: true
+        description: CSV or Excel file containing 'text' column.
+      - name: model_type
+        in: formData
+        type: string
+        enum: ['default', 'hf']
+        default: 'default'
+        description: Choose 'default' (Naive Bayes) or 'hf' (Hugging Face / Deep Learning).
+    responses:
+      200:
+        description: Analysis results including distribution, clusters, and preview data.
+      400:
+        description: Invalid input or file format.
+    """
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     file = request.files['file']
@@ -252,6 +251,28 @@ dataset_finder = DatasetFinder()
 
 @app.route('/search_and_analyze', methods=['POST'])
 def search_and_analyze():
+    """
+    Search web and analyze sentiment of results.
+    ---
+    tags:
+      - Analysis
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            query:
+              type: string
+              example: "Pemilu 2024"
+            model_type:
+              type: string
+              enum: ['default', 'hf']
+    responses:
+      200:
+        description: Search results and sentiment analysis.
+    """
     data = request.json
     if not data or 'query' not in data:
         return jsonify({"error": "Query required"}), 400

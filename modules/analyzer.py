@@ -189,8 +189,9 @@ class SentimentAnalyzer:
 
     def predict_detailed_hf(self, texts: List[str]) -> List[Dict[str, Any]]:
         """
-        Predict utilizing Hugging Face Pipeline
+        Predict utilizing Hugging Face Pipeline with robust error handling and flexible label mapping.
         """
+        # Lazy load model
         if not self.hf_classifier:
              if not self.init_hf_model():
                  # Fallback to standard if init fails
@@ -199,44 +200,36 @@ class SentimentAnalyzer:
         
         results = []
         try:
-            # Pipeline is usually 1 text at a time or batch. 
-            # w11wo/indonesian-roberta-base-sentiment-classifier returns labels like 'positive', 'neutral', 'negative'
-            # Note: The model specific labels might be LABEL_0, LABEL_1 etc. We need to check or map.
-            # Assuming 'positive', 'negative', 'neutral' or similar for this specific model.
-            
-            # Batch processing for efficiency
-            predictions = self.hf_classifier(texts)
+            # Pipeline handling for batch processing
+            # Truncation is important for some models (max 512 tokens usually)
+            predictions = self.hf_classifier(texts, truncation=True, max_length=512)
             
             for i, pred in enumerate(predictions):
-                # pred is usually {'label': 'ERROR', 'score': 0.99}... need to map
+                # pred format can be {'label': '...', 'score': ...}
                 label_raw = pred['label']
                 confidence = pred['score']
                 
-                # Normalize Label
+                # Normalize Label to standard 'positif', 'negatif', 'netral'
                 label = 'netral'
                 score = 0.0
                 
-                if 'positive' in label_raw.lower():
-                    label = 'positif'
-                    score = confidence
-                elif 'negative' in label_raw.lower():
-                    label = 'negatif'
-                    score = -confidence
-                elif 'neutral' in label_raw.lower():
-                    label = 'netral'
-                    score = 0.0
-                
-                # Check for LABEL_0 style if needed
-                if label_raw == 'LABEL_0': # Often positive
+                # Dynamic mapping based on common HF specific outputs
+                # Many indo models use 'positive', 'negative', 'neutral' or label mappings
+                # We normalize to lowercase for check
+                lbl_lower = label_raw.lower()
+
+                if 'pos' in lbl_lower or 'label_0' in lbl_lower: # Label 0 often positive in some indonesian models, check specific model card if unsure. Actually w11wo/indonesian-roberta-base-sentiment-classifier: 0=positive, 1=neutral, 2=negative.
+                     # Wait, let's verify w11wo model mapping:
+                     # id2label: {0: "positive", 1: "neutral", 2: "negative"}
                      label = 'positif'
                      score = confidence
-                elif label_raw == 'LABEL_1': # Often neutral
-                     label = 'netral'
-                     score = 0.0
-                elif label_raw == 'LABEL_2': # Often negative
+                elif 'neg' in lbl_lower or 'label_2' in lbl_lower:
                      label = 'negatif'
                      score = -confidence
-                     
+                elif 'neu' in lbl_lower or 'label_1' in lbl_lower:
+                     label = 'netral'
+                     score = 0.0
+                
                 results.append({
                     "label": label,
                     "confidence_score": confidence,
@@ -246,7 +239,7 @@ class SentimentAnalyzer:
                 
         except Exception as e:
             logger.error(f"HF Prediction Error: {e}")
-            # Fallback
+            # Fallback to standard model for the whole batch if critical failure
             return self.predict_detailed(texts, use_hf=False)
             
         return results

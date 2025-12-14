@@ -35,6 +35,20 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
 }
 
+// Model Selection Logic
+function selectModel(element, value) {
+    // UI Update
+    const group = element.closest('.radio-group');
+    if (!group) return;
+
+    group.querySelectorAll('.radio-card').forEach(card => card.classList.remove('selected'));
+    element.classList.add('selected');
+
+    // Check hidden radio
+    const radio = element.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // File Input Helper
     const fileInputs = document.querySelectorAll('.file-input');
@@ -98,7 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ query: query })
+                body: JSON.stringify({
+                    query: query,
+                    model_type: document.querySelector('input[name="model_type"]:checked')?.value || 'default'
+                })
             });
 
             const data = await response.json();
