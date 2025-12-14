@@ -32,28 +32,23 @@ logger.info("Modules loaded.")
 def index():
     return render_template('index.html', model_trained=analyzer.is_trained)
 
-import threading
-import time
+# State Manager
+from modules.training_state import TrainingStateManager
 
-# Training Status State
-training_status = {
-    "is_training": False,
-    "progress": 0,
-    "message": "Idle",
-    "result": None
-}
+# Initialize State Manager
+# Gunakan UPLOAD_FOLDER agar file persistent dan accessible
+state_manager = TrainingStateManager(upload_folder=app.config['UPLOAD_FOLDER'])
 
 def run_training_background(filepath, app_config_upload_folder):
-    global training_status
-    training_status["is_training"] = True
-    training_status["progress"] = 0
-    training_status["message"] = "Memulai proses training..."
-    training_status["result"] = None
+    # Re-instantiate manager inside thread to ensure clean state handle if needed, 
+    # though file locking handles concurrency.
+    manager = TrainingStateManager(upload_folder=app_config_upload_folder)
     
     try:
+        manager.start_training()
+        
         # Read file
-        training_status["message"] = "Membaca file dataset..."
-        training_status["progress"] = 10
+        manager.update_status(progress=10, message="Membaca file dataset...")
         
         if filepath.endswith('.csv'):
             df = pd.read_csv(filepath)
@@ -67,8 +62,7 @@ def run_training_background(filepath, app_config_upload_folder):
             raise ValueError("Dataset harus memiliki kolom 'text' dan 'label'.")
         
         # Cleaning
-        training_status["message"] = "Membersihkan data..."
-        training_status["progress"] = 20
+        manager.update_status(progress=20, message="Membersihkan data...")
         df = df.dropna(subset=['text', 'label'])
         df = df[df['text'].astype(str).str.strip() != '']
         df = df[df['label'].astype(str).str.strip() != '']
@@ -80,38 +74,32 @@ def run_training_background(filepath, app_config_upload_folder):
         labels = df['label'].astype(str).tolist()
         
         # Preprocessing
-        training_status["message"] = f"Preprocessing {len(texts)} data (bisa lama)..."
-        training_status["progress"] = 30
+        manager.update_status(progress=30, message=f"Preprocessing {len(texts)} data (bisa lama)...")
         
         clean_texts = preprocessor.preprocess_batch(texts)
         
-        training_status["message"] = "Melatih model Naive Bayes..."
-        training_status["progress"] = 80
+        manager.update_status(progress=80, message="Melatih model Naive Bayes...")
         
         # Train
         analyzer.train(clean_texts, labels)
         
-        training_status["progress"] = 100
-        training_status["message"] = "Training selesai!"
-        training_status["result"] = {
+        result = {
             "success": True,
             "data_count": len(texts),
             "message": f"Model berhasil dilatih dengan {len(texts)} data baris."
         }
+        manager.finish_training(result)
         
     except Exception as e:
         logger.error(f"Training Error: {e}")
-        training_status["progress"] = 0
-        training_status["message"] = f"Error: {str(e)}"
-        training_status["result"] = {"success": False, "error": str(e)}
-        
-    finally:
-        training_status["is_training"] = False
+        manager.error_training(str(e))
+
 
 
 @app.route('/train', methods=['POST'])
 def train():
-    if training_status["is_training"]:
+    current_status = state_manager.get_status()
+    if current_status["is_training"]:
         return jsonify({"error": "Training sedang berjalan. Harap tunggu."}), 409
 
     if 'file' not in request.files:
@@ -135,7 +123,7 @@ def train():
 
 @app.route('/train_status', methods=['GET'])
 def get_train_status():
-    return jsonify(training_status)
+    return jsonify(state_manager.get_status())
 
 @app.route('/analyze', methods=['POST'])
 def analyze():

@@ -168,16 +168,36 @@ function pollTrainingStatus() {
     const resultDiv = document.getElementById('train-result');
     const statusText = loading; // We reuse the loading div text
 
-    const interval = setInterval(async () => {
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutes approx (avg 1s)
+    let errors = 0;
+    const maxErrors = 5;
+
+    const checkStatus = async () => {
         try {
             const res = await fetch('/train_status');
+            if (!res.ok) throw new Error("Server error");
+
             const status = await res.json();
+            errors = 0; // Reset errors on success
 
             if (status.is_training) {
                 statusText.textContent = `Sedang melatih model: ${status.message} (${status.progress}%)`;
                 loading.classList.remove('hidden');
+
+                attempts++;
+                if (attempts > maxAttempts) {
+                    showToast("Training memakan waktu terlalu lama. Cek log server/reload nanti.", "warning");
+                    return; // Stop polling but leave UI as is or button to retry
+                }
+
+                // Exponential polling: slow down if it takes long
+                let delay = 1000;
+                if (attempts > 60) delay = 5000; // > 1 min
+
+                setTimeout(checkStatus, delay);
+
             } else {
-                clearInterval(interval);
                 loading.classList.add('hidden');
 
                 if (status.result && status.result.success) {
@@ -188,15 +208,27 @@ function pollTrainingStatus() {
                 } else if (status.result && !status.result.success) {
                     resultDiv.innerHTML = `<div class="alert-error" style="color: red; margin-top: 10px;">Error: ${status.result.error}</div>`;
                     showToast('Training Gagal: ' + status.result.error, 'error');
+                } else if (!status.result) {
+                    // Just idle/finished without result payload (maybe refreshed)
+                    // Do nothing
                 }
+
                 resultDiv.classList.remove('hidden');
             }
         } catch (e) {
             console.error("Polling error", e);
-            clearInterval(interval);
-            showToast("Gagal mengambil status training.", "error");
+            errors++;
+            if (errors <= maxErrors) {
+                setTimeout(checkStatus, 2000 * errors); // Backoff on error
+            } else {
+                showToast("Gagal mengambil status training berulang kali.", "error");
+                loading.classList.add('hidden');
+            }
         }
-    }, 1000);
+    };
+
+    // Start polling
+    checkStatus();
 }
 
 let sentimentChart = null;
@@ -226,15 +258,30 @@ function renderResults(data) {
     renderSentimentChart(data.distribution);
     renderClusterChart(data.cluster_counts);
 
+    // Helper: Simple HTML Escape
+    const escapeHtml = (unsafe) => {
+        return (unsafe || "").toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     // Table
     const tbody = document.querySelector('#result-table tbody');
     tbody.innerHTML = '';
     data.data.forEach(item => {
         const tr = document.createElement('tr');
+        const safeText = escapeHtml(item.text);
+        const shortText = safeText.substring(0, 100) + (safeText.length > 100 ? '...' : '');
+        const safeCluster = item.cluster !== undefined ? 'Cluster ' + escapeHtml(item.cluster) : '-';
+        const safeSentiment = escapeHtml(item.sentiment || '-');
+
         tr.innerHTML = `
-            <td>${item.text.substring(0, 100)}${item.text.length > 100 ? '...' : ''}</td>
-            <td>${item.sentiment || '-'}</td>
-            <td>${item.cluster !== undefined ? 'Cluster ' + item.cluster : '-'}</td>
+            <td>${shortText}</td>
+            <td>${safeSentiment}</td>
+            <td>${safeCluster}</td>
         `;
         tbody.appendChild(tr);
     });

@@ -18,12 +18,18 @@ RUN pip install --upgrade pip && \
 # Copy project
 COPY . /app/
 
-# Create necessary directories
-RUN mkdir -p uploads models
+# Create necessary directories and set permissions
+RUN mkdir -p uploads models && \
+    chmod 777 uploads models
+
+# Create a non-root user
+RUN adduser --disabled-password --gecos '' appuser
+USER appuser
 
 # Expose port
 EXPOSE 5000
 
 # Run gunicorn
 # 4 workers is a safe default for small-medium load
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "app:app"]
+# Preload app to save memory and ensure consistency
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--preload", "app:app"]
