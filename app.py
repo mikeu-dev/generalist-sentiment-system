@@ -291,7 +291,8 @@ def search_and_analyze():
     try:
         # 1. Search
         logger.info("Searching web...")
-        raw_texts = dataset_finder.search(query, max_results=50)
+        limit = int(data.get('limit', 100))
+        raw_texts = dataset_finder.search(query, max_results=limit)
         
         model_type = data.get('model_type', 'default')
         use_hf = (model_type == 'hf')

@@ -52,9 +52,16 @@
                 <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15") untuk mencari data real-time dan menganalisis
                     sentimennya.</p>
                 <form id="search-form">
-                    <div style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                         <input type="text" name="query" placeholder="Ketik topik atau kata kunci..." required
-                            autocomplete="off">
+                            autocomplete="off" style="flex: 1;">
+                        <select name="limit"
+                            style="width: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                            <option value="50">50 Data</option>
+                            <option value="100" selected>100 Data</option>
+                            <option value="200">200 Data</option>
+                            <option value="500">500 Data</option>
+                        </select>
                     </div>
                     <button type="submit" class="btn-primary">
                         <i class="ph ph-magnifying-glass"></i> Cari & Analisis

@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     query: query,
+                    limit: form.querySelector('select[name="limit"]').value,
                     model_type: document.querySelector('input[name="model_type"]:checked')?.value || 'default'
                 })
             });
