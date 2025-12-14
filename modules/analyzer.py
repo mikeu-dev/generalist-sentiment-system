@@ -1,5 +1,6 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.cluster import KMeans
 import pandas as pd
 import pickle
@@ -15,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
     def __init__(self, model_dir: str = 'models'):
-        self.vectorizer = TfidfVectorizer()
-        self.classifier = MultinomialNB()
+        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2)) # Capture bigrams
+        # LinearSVC is generally better for text, CalibratedClassifierCV allows predict_proba
+        svc = LinearSVC(random_state=42)
+        self.classifier = CalibratedClassifierCV(svc) 
         self.kmeans = KMeans(n_clusters=3, random_state=42)
         self.model_dir = model_dir
         

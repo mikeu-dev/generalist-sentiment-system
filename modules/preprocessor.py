@@ -14,8 +14,19 @@ class TextPreprocessor:
         self.stemmer = self.stemmer_factory.create_stemmer()
         
         self.stopword_factory = StopWordRemoverFactory()
-        self.stopword_remover = self.stopword_factory.create_stop_word_remover()
-        logger.info("Text Preprocessor Initialized.")
+        
+        # Customize Stopwords to exclude negations
+        stopwords = self.stopword_factory.get_stop_words()
+        excluded_stopwords = ['tidak', 'tak', 'bukan', 'jangan', 'kurang', 'belum', 'tidaklah']
+        new_stopwords = [word for word in stopwords if word not in excluded_stopwords]
+        
+        # Sastrawi doesn't allow easy removal, so we create a new dictionary
+        from Sastrawi.StopWordRemover.StopWordRemover import StopWordRemover
+        from Sastrawi.Dictionary.ArrayDictionary import ArrayDictionary
+        
+        dictionary = ArrayDictionary(new_stopwords)
+        self.stopword_remover = StopWordRemover(dictionary)
+        logger.info("Text Preprocessor Initialized (Negations preserved).")
 
     def clean_text(self, text: str) -> str:
         """
