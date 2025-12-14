@@ -158,8 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let sentimentChart = null;
 let clusterChart = null;
+let lastResultData = null; // Store data for export
 
 function renderResults(data) {
+    lastResultData = data; // Save for export logic
+
     // Basic Metrics
     document.getElementById('total-reviews').textContent = data.total;
 
@@ -200,6 +203,38 @@ function renderResults(data) {
         document.getElementById('sentiment-warning').classList.add('hidden');
     }
 }
+
+// Export CSV Function
+document.getElementById('download-btn').addEventListener('click', () => {
+    if (!lastResultData || !lastResultData.data) {
+        showToast("Tidak ada data untuk diunduh.", "error");
+        return;
+    }
+
+    const rows = [
+        ["Text", "Sentiment", "Cluster"] // Header
+    ];
+
+    lastResultData.data.forEach(item => {
+        // Escape quotes and handle newlines for CSV
+        const safeText = `"${item.text.replace(/"/g, '""').replace(/\n/g, ' ')}"`;
+        rows.push([safeText, item.sentiment || "", item.cluster !== undefined ? item.cluster : ""]);
+    });
+
+    let csvContent = "data:text/csv;charset=utf-8,"
+        + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const filename = `dataset_${lastResultData.query || 'export'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link); // Required for FF
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("Download dimulai!", "success");
+});
 
 function renderSentimentChart(distribution) {
     const ctx = document.getElementById('sentimentChart').getContext('2d');
