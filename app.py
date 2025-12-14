@@ -368,10 +368,9 @@ def search_and_analyze():
         results['method'] = "model_prediction" if analyzer.is_trained else "lexicon_fallback"
             
         return jsonify(results)
-            
-        return jsonify(results)
 
     except Exception as e:
+        logger.error(f"Search and Analyze Error: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

@@ -289,15 +289,23 @@ class SentimentAnalyzer:
                  X = self.vectorizer.transform(texts)
              except Exception as e:
                  logger.warning(f"Vectorizer transform failed: {e}. Fitting temporary one.")
-                 temp_vectorizer = TfidfVectorizer()
-                 X = temp_vectorizer.fit_transform(texts)
+                 try:
+                     temp_vectorizer = TfidfVectorizer()
+                     X = temp_vectorizer.fit_transform(texts)
+                 except ValueError:
+                     logger.warning("Clustering fallback failed: Empty vocabulary, returning cluster 0.")
+                     return [0] * len(texts)
         else:
              # Jika belum fit sama sekali (belum ada model), kita fit dengan data ini
              # Tapi jangan simpan ke self.vectorizer agar tidak merusak training masa depan
              # Gunakan temporary vectorizer
-             logger.debug("Clustering using temporary vectorizer (Model not trained).")
-             temp_vectorizer = TfidfVectorizer()
-             X = temp_vectorizer.fit_transform(texts)
+             try:
+                 logger.debug("Clustering using temporary vectorizer (Model not trained).")
+                 temp_vectorizer = TfidfVectorizer()
+                 X = temp_vectorizer.fit_transform(texts)
+             except ValueError:
+                 logger.warning("Clustering failed: Empty vocabulary (texts might be empty or stopwords only). Returning cluster 0.")
+                 return [0] * len(texts)
             
         # Ensure distinct clusters if N > samples
         n_samples = X.shape[0]
