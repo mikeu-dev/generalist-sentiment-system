@@ -39,14 +39,23 @@ class SentimentAnalyzer:
         """
         Mengelompokkan teks ke dalam topik menggunakan K-Means.
         """
-        # Kita gunakan vectorizer yang sama agar fitur konsisten, 
-        # tapi idealnya clustering bisa punya vocabulary sendiri jika domain berubah drastis.
-        # Untuk generalist system, kita coba transform dulu.
-        if not hasattr(self.vectorizer, 'vocabulary_'):
-             # Jika belum fit, kita fit dulu dengan data ini (unsupervised mode partial)
-             X = self.vectorizer.fit_transform(texts)
+        # Gunakan vectorizer yang sudah ada jika vocabulary sudah terbentuk
+        # Ini penting agar fitur konsisten dengan data training (jika ada)
+        if hasattr(self.vectorizer, 'vocabulary_'):
+             # Transform menggunakan vocabulary yang sudah ada
+             try:
+                 X = self.vectorizer.transform(texts)
+             except Exception:
+                 # Fallback: jika word di text baru tidak ada di vocab lama sama sekali
+                 # atau terjadi mismatch feature, kita fit ulang khusus untuk sesi unsupervised ini
+                 # Catatan: ini tidak mengubah self.vectorizer utama jika kita buat instance baru, 
+                 # tapi untuk simplifikasi kita fit_transform temp vectorizer atau handle error
+                 print("Warning: Vocabulary mismatch or empty, creating temporary vectorizer for clustering.")
+                 temp_vectorizer = TfidfVectorizer()
+                 X = temp_vectorizer.fit_transform(texts)
         else:
-            X = self.vectorizer.transform(texts)
+             # Jika belum fit sama sekali (belum ada model), kita fit dengan data ini
+             X = self.vectorizer.fit_transform(texts)
             
         self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         clusters = self.kmeans.fit_predict(X)

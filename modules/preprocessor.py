@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
@@ -26,6 +27,13 @@ class TextPreprocessor:
         text = re.sub(r'\s+', ' ', text).strip()
         return text
 
+    @lru_cache(maxsize=5000)
+    def cached_stem(self, text):
+        """
+        Wrapper cached untuk stemming.
+        """
+        return self.stemmer.stem(text)
+
     def preprocess(self, text):
         """
         Melakukan full preprocessing: cleaning -> stopword removal -> stemming.
@@ -35,9 +43,8 @@ class TextPreprocessor:
         # Stopword removal
         text = self.stopword_remover.remove(text)
         
-        # Stemming
-        # Note: Stemming is slow. In production, consider caching or lighter stemming.
-        text = self.stemmer.stem(text)
+        # Stemming with cache
+        text = self.cached_stem(text)
         
         return text
 
@@ -45,4 +52,6 @@ class TextPreprocessor:
         """
         Memproses list teks.
         """
+        # Hapus cache jika terlalu besar untuk mencegah memory leak di long-running process
+        # jika diperlukan, tapi maxsize=5000 cukup aman untuk aplikasi ini.
         return [self.preprocess(t) for t in texts]
