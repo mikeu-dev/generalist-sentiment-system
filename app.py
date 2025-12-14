@@ -7,6 +7,8 @@ from logging.config import dictConfig
 from config import DevelopmentConfig, ProductionConfig
 from modules.preprocessor import TextPreprocessor
 from modules.analyzer import SentimentAnalyzer
+from models.sentiment_log import db, SentimentLog
+
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -19,6 +21,11 @@ if os.environ.get('FLASK_ENV') == 'production':
     app.config.from_object(ProductionConfig)
 else:
     app.config.from_object(DevelopmentConfig)
+
+db.init_app(app)
+with app.app_context():
+    db.create_all()
+
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -165,44 +172,73 @@ def analyze():
             results = {"total": len(raw_texts), "distribution": {}, "clusters": []}
             
             # Sentiment Prediction
-            if analyzer.is_trained:
-                predictions = analyzer.predict(clean_texts)
-                df['sentiment_pred'] = predictions
-                # Count distribution
-                dist = df['sentiment_pred'].value_counts().to_dict()
-                results['distribution'] = dist
-            else:
-                results['warning'] = "Model belum dilatih. Sentimen tidak diprediksi."
-
-            # Clustering (Unsupervised)
-            try:
-                clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
-                df['cluster'] = clusters
-                
-                # Analyze clusters (simple keyword extraction roughly or just counts)
-                cluster_counts = df['cluster'].value_counts().to_dict()
-                
-                # Convert valid int64 to int for JSON serialization
-                results['cluster_counts'] = {int(k): int(v) for k, v in cluster_counts.items()}
-            except Exception as e:
-                logger.error(f"Clustering error: {e}")
-                results['cluster_error'] = str(e)
-
-            # Prepare sample data for frontend (first 100 rows)
+            # Sentiment Prediction & Clustering
+            # We use predict_detailed to get full info
+            logger.info("Predicting sentiment detailed...")
+            details = analyzer.predict_detailed(clean_texts)
+            
+            # Clustering
+            logger.info("Clustering topics...")
+            clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
+            
+            # Save to DB and prepare response
             preview_data = []
-            for i, row in df.head(100).iterrows():
-                item = {"text": row[text_col]}
-                if 'sentiment_pred' in row:
-                    item['sentiment'] = row['sentiment_pred']
-                if 'cluster' in row:
-                    item['cluster'] = int(row['cluster'])
-                preview_data.append(item)
+            distribution = {}
             
-            results['data'] = preview_data
+            for i, text in enumerate(raw_texts):
+                detail = details[i]
+                cluster_id = int(clusters[i]) if i < len(clusters) else 0
+                
+                # DB Log
+                log = SentimentLog(
+                    text=text,
+                    label=detail['label'],
+                    sentiment_score=detail['sentiment_score'],
+                    confidence_score=detail['confidence_score'],
+                    cluster=cluster_id,
+                    source='file_upload',
+                    metadata_json={'filename': file.filename},
+                    model_version=detail['model_version']
+                )
+                db.session.add(log)
+                
+                # Response Data
+                if i < 100:
+                    preview_data.append({
+                        "text": text,
+                        "sentiment": detail['label'],
+                        "cluster": cluster_id,
+                        "score": detail['sentiment_score']
+                    })
+                
+                # Distribution stats
+                lbl = detail['label']
+                distribution[lbl] = distribution.get(lbl, 0) + 1
             
+            db.session.commit()
+            
+            # Cluster stats
+            cluster_counts = {}
+            for c in clusters:
+                c_int = int(c)
+                cluster_counts[c_int] = cluster_counts.get(c_int, 0) + 1
+
+            results = {
+                "total": len(raw_texts),
+                "distribution": distribution,
+                "cluster_counts": cluster_counts,
+                "data": preview_data,
+                "model_version": details[0]['model_version'] if details else "unknown"
+            }
+            
+            if not analyzer.is_trained and details and details[0]['model_version'] == 'lexicon_rule_based':
+                 results['warning'] = "Model belum dilatih. Menggunakan Rule-based lexicon."
+
             return jsonify(results)
 
         except Exception as e:
+            db.session.rollback()
+            logger.error(f"Analysis Error: {e}")
             return jsonify({"error": str(e)}), 500
 
 from modules.dataset_finder import DatasetFinder
@@ -240,48 +276,52 @@ def search_and_analyze():
         
         # 3. Predict Sentiment (using existing model or lexicon)
         # Always try to predict (analyzer now handles fallback)
-        try:
-            predictions = analyzer.predict(clean_texts)
-            # Make a temporary DF for easy grouping
-            df_temp = pd.DataFrame({'text': raw_texts, 'sentiment': predictions})
+        # 3. Predict & Cluster & Save
+        details = analyzer.predict_detailed(clean_texts)
+        clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
+        
+        preview_data = []
+        distribution = {}
+        cluster_counts = {}
+        
+        for i, text in enumerate(raw_texts):
+            detail = details[i]
+            cluster_id = int(clusters[i]) if i < len(clusters) else 0
             
-            dist = df_temp['sentiment'].value_counts().to_dict()
-            results['distribution'] = dist
+            # DB Log
+            log = SentimentLog(
+                text=text,
+                label=detail['label'],
+                sentiment_score=detail['sentiment_score'],
+                confidence_score=detail['confidence_score'],
+                cluster=cluster_id,
+                source='web_search',
+                metadata_json={'query': query},
+                model_version=detail['model_version']
+            )
+            db.session.add(log)
             
-            if not analyzer.is_trained:
-                 results['method'] = "lexicon_fallback"
-                 logger.info("Using Lexicon Method (Bootstrap)")
-            else:
-                 results['method'] = "model_prediction"
-
-        except Exception as e:
-             results['warning'] = f"Gagal memprediksi: {str(e)}"
-             logger.error(f"Prediction error: {e}")
-
-        # 4. Clustering
-
-        # 4. Clustering
-        try:
-            clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
-            # Add to temp df
-            # If length matches
-            if len(clusters) == len(raw_texts):
-                cluster_counts = pd.Series(clusters).value_counts().to_dict()
-                results['cluster_counts'] = {int(k): int(v) for k, v in cluster_counts.items()}
-                
-                # Assign to preview
-                preview_data = []
-                for i, text in enumerate(raw_texts[:100]): # Limit 100
-                    item = {"text": text}
-                    if 'predictions' in locals():
-                        item['sentiment'] = predictions[i]
-                    item['cluster'] = int(clusters[i])
-                    preview_data.append(item)
-                results['data'] = preview_data
-                
-        except Exception as e:
-            logger.error(f"Clustering error: {e}")
-            results['cluster_error'] = str(e)
+            # Response Data
+            if i < 100:
+                preview_data.append({
+                    "text": text,
+                    "sentiment": detail['label'],
+                    "cluster": cluster_id
+                })
+            
+            # Stats
+            lbl = detail['label']
+            distribution[lbl] = distribution.get(lbl, 0) + 1
+            cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
+            
+        db.session.commit()
+        
+        results['distribution'] = distribution
+        results['cluster_counts'] = cluster_counts
+        results['data'] = preview_data
+        results['method'] = "model_prediction" if analyzer.is_trained else "lexicon_fallback"
+            
+        return jsonify(results)
             
         return jsonify(results)
 

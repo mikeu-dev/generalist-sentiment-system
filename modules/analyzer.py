@@ -25,6 +25,7 @@ class SentimentAnalyzer:
             os.makedirs(self.model_dir)
             
         self.is_trained: bool = False
+        self.current_model_version = "v0.0.0"
         self.load_model()
 
     def train(self, texts: List[str], labels: List[str]) -> None:
@@ -44,31 +45,93 @@ class SentimentAnalyzer:
 
     def predict(self, texts: List[str]) -> List[str]:
         """
-        Memprediksi sentimen ulasan.
-        Jika model belum dilatih, gunakan Rule-based (Lexicon).
+        Legacy wrapper for predict_detailed to return only labels.
         """
-        logger.debug(f"predict called. is_trained={self.is_trained}")
+        details = self.predict_detailed(texts)
+        return [d['label'] for d in details]
+
+    def predict_detailed(self, texts: List[str]) -> List[Dict[str, Any]]:
+        """
+        Returns detailed prediction with confidence and scores.
+        """
+        logger.debug(f"predict_detailed called. is_trained={self.is_trained}")
         
+        if not texts:
+            return []
+            
+        results = []
+
         if self.is_trained:
             # Machine Learning Prediction
-            logger.debug("Using ML Model.")
-            # Handle empty input
-            if not texts:
-                return []
-            
             try:
                 X = self.vectorizer.transform(texts)
-                res = self.classifier.predict(X)
-                logger.debug(f"ML Result sample: {res[:5]}")
-                return list(res)
+                # Ensure classifier has predict_proba
+                if hasattr(self.classifier, "predict_proba"):
+                    probs = self.classifier.predict_proba(X)
+                    classes = self.classifier.classes_
+                    
+                    # Map classes to index
+                    # Assuming classes are 'positif', 'negatif', 'netral'
+                    # We need to handle dynamic classes
+                    
+                    for i, prob_dist in enumerate(probs):
+                        # Get max prob class
+                        max_idx = prob_dist.argmax()
+                        label = classes[max_idx]
+                        confidence = float(prob_dist[max_idx])
+                        
+                        # Calculate Score (-1 to 1)
+                        # We try to find indexes for pos/neg
+                        score = 0.0
+                        
+                        # Safe lookup
+                        pos_idx = -1
+                        neg_idx = -1
+                        
+                        # Case insensitive lookup
+                        for idx, cls_name in enumerate(classes):
+                            if 'positif' in str(cls_name).lower():
+                                pos_idx = idx
+                            elif 'negatif' in str(cls_name).lower():
+                                neg_idx = idx
+                                
+                        if pos_idx != -1 and neg_idx != -1:
+                            score = float(prob_dist[pos_idx] - prob_dist[neg_idx])
+                        elif label.lower() == 'positif':
+                            score = confidence
+                        elif label.lower() == 'negatif':
+                            score = -confidence
+                        
+                        results.append({
+                            "label": label,
+                            "confidence_score": confidence,
+                            "sentiment_score": score,
+                            "model_version": self.current_model_version
+                        })
+                else:
+                    # Fallback if no proba
+                    preds = self.classifier.predict(X)
+                    for p in preds:
+                        results.append({
+                            "label": p,
+                            "confidence_score": 1.0,
+                            "sentiment_score": 1.0 if 'positif' in str(p).lower() else -1.0 if 'negatif' in str(p).lower() else 0.0,
+                            "model_version": self.current_model_version
+                        })
+
             except Exception as e:
-                logger.error(f"Prediction Error: {e}")
-                # Fallback if transform fails (e.g. empty vocabulary?)
-                return ["netral"] * len(texts)
+                logger.error(f"ML Prediction Error: {e}")
+                # Fallback to Netral
+                for _ in texts:
+                    results.append({
+                        "label": "netral",
+                        "confidence_score": 0.0,
+                        "sentiment_score": 0.0,
+                        "model_version": "error_fallback"
+                    })
         else:
             # Fallback: Rule-based Prediction
             logger.debug("Using Lexicon Fallback.")
-            results = []
             for text in texts:
                 score = 0
                 words = text.split()
@@ -78,15 +141,25 @@ class SentimentAnalyzer:
                     elif word in NEGATIVE_WORDS:
                         score -= 1
                 
+                label = "netral"
+                # Lexicon score logic
+                norm_score = 0.0 # Normalize roughly? 
+                # Let's just clamp -1 to 1
                 if score > 0:
-                    results.append("positif")
+                    label = "positif"
+                    norm_score = min(1.0, score * 0.2)
                 elif score < 0:
-                    results.append("negatif")
-                else:
-                    results.append("netral")
+                    label = "negatif"
+                    norm_score = max(-1.0, score * 0.2)
+                
+                results.append({
+                    "label": label,
+                    "confidence_score": 0.5, # Rule based, unsure
+                    "sentiment_score": float(norm_score),
+                    "model_version": "lexicon_rule_based"
+                })
             
-            logger.debug(f"Lexicon Result sample: {results[:5]}")
-            return results
+        return results
 
     def cluster_topics(self, texts: List[str], n_clusters: int = 3) -> List[int]:
         """
@@ -173,6 +246,7 @@ class SentimentAnalyzer:
                 self.vectorizer = data['vectorizer']
                 self.classifier = data['classifier']
                 self.is_trained = data.get('is_trained', False)
+                self.current_model_version = os.path.basename(latest_file)
             logger.info("Model loaded successfully.")
         except Exception as e:
             logger.error(f"Error loading model: {e}")
