@@ -5,3 +5,6 @@ sastrawi
 nltk
 matplotlib
 wordcloud
+ddgs
+beautifulsoup4
+requests
