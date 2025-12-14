@@ -1,8 +1,13 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pickle
 from modules.analyzer import SentimentAnalyzer
 
 try:
-    analyzer = SentimentAnalyzer(model_path='model_sentiment.pkl')
+    # Analyzer doesn't support model_path, it auto-loads from model_dir
+    analyzer = SentimentAnalyzer(model_dir='models')
+    print(f"Loaded model version: {analyzer.current_model_version}")
     if analyzer.is_trained:
         print(f"Model is trained.")
         print(f"Classes: {analyzer.classifier.classes_}")

@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 import numpy as np
 from modules.analyzer import SentimentAnalyzer
@@ -29,7 +32,10 @@ def reproduce_issue():
         prep = TextPreprocessor()
         clean_texts = prep.preprocess_batch(texts)
         
-        analyzer = SentimentAnalyzer(model_path='model_broken.pkl')
+        analyzer = SentimentAnalyzer(model_dir='test_issue_models')
+        if not os.path.exists('test_issue_models'):
+            os.makedirs('test_issue_models')
+            
         analyzer.train(clean_texts, labels)
         
         # Predict

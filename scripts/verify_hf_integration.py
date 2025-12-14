@@ -4,7 +4,8 @@ import os
 import logging
 
 # Add root to path
-sys.path.append(os.getcwd())
+# Add root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.analyzer import SentimentAnalyzer
 

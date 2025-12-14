@@ -81,17 +81,19 @@ Jika baru pertama kali dijalankan, model mungkin belum tersedia.
 
 ## 📂 Struktur Proyek
 
-```
 generalist-sentiment-system/
 ├── app.py                  # Entry point aplikasi Flask
+├── data/
+│   └── samples/            # Contoh dataset (CSV)
+├── models/                 # Direktori model tersimpan (PKL)
 ├── modules/
 │   ├── analyzer.py         # Logika ML (Naive Bayes & KMeans)
 │   └── preprocessor.py     # Logika Preprocessing (Sastrawi)
+├── scripts/                # Script utilitas dan verifikasi
 ├── static/                 # CSS, JS, Image
 ├── templates/              # File HTML
 ├── requirements.txt        # Daftar library Python
 └── README.md               # Dokumentasi
-```
 
 ## 📝 Catatan Penting
 -   **Performa**: Proses stemming (pemotongan kata dasar) menggunakan Sastrawi bisa memakan waktu untuk dataset yang sangat besar. Sistem ini sudah dilengkapi dengan mekanisme **Caching** untuk mempercepat proses pada kata-kata yang berulang.

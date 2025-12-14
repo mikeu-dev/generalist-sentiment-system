@@ -1,4 +1,7 @@
+import sys
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# import os already imported above
 import glob
 import time
 import pandas as pd
