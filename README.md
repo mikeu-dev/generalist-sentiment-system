@@ -4,16 +4,24 @@ Sistem analisis sentimen berbasis web yang dirancang untuk memproses ulasan berb
 
 ## 🚀 Fitur Utama
 
--   **Analisis Sentimen (Supervised)**: Mengklasifikasikan teks ke dalam kategori sentimen (misal: Positif/Negatif) menggunakan algoritma **Naive Bayes**.
--   **Topic Clustering (Unsupervised)**: Mengelompokkan ulasan-ulasan yang memiliki kemiripan topik menggunakan algoritma **K-Means Clustering**, tanpa memerlukan label sebelumnya.
--   **Preprocessing Bahasa Indonesia**: Pembersihan teks yang optimal menggunakan **Sastrawi** (Stemming & Stopword Removal) yang telah dioptimasi dengan caching.
--   **Custom Training**: Pengguna dapat melatih ulang model dengan dataset mereka sendiri melalui antarmuka web.
+-   **Analisis Sentimen (Hybrid)**: Mendukung dua mode analisis:
+    -   **Classic**: Naive Bayes (Cepat, efisien).
+    -   **Advanced**: Hugging Face Transformers (Deep Learning, akurasi tinggi, konteks lebih baik).
+-   **Topic Clustering (Unsupervised)**: Mengelompokkan ulasan-ulasan yang memiliki kemiripan topik menggunakan algoritma **K-Means Clustering**.
+-   **Asynchronous Training**: Proses training model berjalan di latar belakang menggunakan **Redis Queue & Worker**, sehingga tidak memblokir antarmuka pengguna.
+-   **Database Persistence**: Menyimpan riwayat analisis dan meta-data model menggunakan **SQLite**.
+-   **API Documentation**: Dokumentasi API interaktif yang lengkap menggunakan **Swagger UI**.
+-   **Preprocessing Bahasa Indonesia**: Pembersihan teks yang optimal menggunakan **Sastrawi**.
+-   **Custom Training**: Pengguna dapat melatih ulang model dengan dataset mereka sendiri.
 -   **Visualisasi Data**: Menampilkan grafik distribusi sentimen dan hasil clustering.
 
 ## 🛠️ Teknologi
 
 -   **Backend**: Python (Flask)
--   **Machine Learning**: Scikit-Learn (MultinomialNB, KMeans, TF-IDF)
+-   **Machine Learning**: Scikit-Learn, Transformers (Hugging Face)
+-   **Task Queue**: Redis & RQ
+-   **Database**: SQLite (SQLAlchemy)
+-   **Documentation**: Flasgger (Swagger/OpenAPI)
 -   **NLP**: Sastrawi & Regex
 -   **Frontend**: HTML5, CSS3, Vanilla JS
 -   **Data Processing**: Pandas
@@ -32,14 +40,27 @@ Sistem analisis sentimen berbasis web yang dirancang untuk memproses ulasan berb
     ```bash
     pip install -r requirements.txt
     ```
+4.  **Install & Start Redis** (Wajib untuk Queue):
+    -   **Linux (Ubuntu/Debian)**:
+        ```bash
+        sudo apt-get install redis-server
+        sudo service redis-server start
+        ```
+    -   **Windows**: Gunakan WSL atau download Redis installer.
+    -   **Mac**: `brew install redis` && `brew services start redis`
 
 ## 🖥️ Cara Penggunaan
 
 1.  **Jalankan Aplikasi**:
     ```bash
+    # Terminal 1: Jalankan Web Server
     python app.py
+
+    # Terminal 2: Jalankan Worker (untuk background training)
+    python worker.py
     ```
 2.  Buka browser dan akses alamat: `http://localhost:5000`.
+3.  Untuk melihat **Dokumentasi API**, buka `http://localhost:5000/apidocs`.
 
 ### Alur Kerja
 
