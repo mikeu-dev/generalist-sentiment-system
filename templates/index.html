@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generalist Sentiment Analysis System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/loader.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -59,7 +60,19 @@
                         <i class="ph ph-magnifying-glass"></i> Cari & Analisis
                     </button>
                 </form>
-                <div id="search-loading" class="loading hidden">Sedang mencari data dan menganalisis...</div>
+                <div id="search-loading" class="loading hidden">
+                    <div class="terminal-loader">
+                        <div class="terminal-header">
+                            <div class="terminal-dot red"></div>
+                            <div class="terminal-dot yellow"></div>
+                            <div class="terminal-dot green"></div>
+                            <span>System Process</span>
+                        </div>
+                        <div class="terminal-window" id="process-log">
+                            <!-- Log types will appear here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 

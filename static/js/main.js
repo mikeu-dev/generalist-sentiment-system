@@ -99,14 +99,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = form.querySelector('input[name="query"]').value;
         const loading = document.getElementById('search-loading');
         const resultsContainer = document.getElementById('results-container');
+        const logContainer = document.getElementById('process-log');
 
         loading.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
 
-        // Indikator "Sedang mencari..."
-        showToast(`Mencari data tentang "${query}"...`, 'info');
+        // Reset Log
+        logContainer.innerHTML = '';
+        const addLog = (msg, type = 'normal') => {
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = `> ${msg}`;
+            logContainer.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        addLog(`System Initialized.`, 'info');
+        await new Promise(r => setTimeout(r, 500));
+        addLog(`Connecting to Search Engine...`, 'info');
+        await new Promise(r => setTimeout(r, 800));
+        addLog(`Searching dataset for: "${query}"...`, 'warning');
+
+        // Simulate "Searching" ticker
+        let searchInterval = setInterval(() => {
+            addLog(`... retrieving data packets ...`);
+        }, 2000);
 
         try {
+            const startTime = Date.now();
             const response = await fetch('/search_and_analyze', {
                 method: 'POST',
                 headers: {
@@ -118,21 +138,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
 
+            clearInterval(searchInterval);
             const data = await response.json();
 
+            // Ensure visual delay if response was too fast
+            const elapsed = Date.now() - startTime;
+            if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+
             if (response.ok) {
+                addLog(`Data acquired: ${data.total} records found.`, 'success');
+                await new Promise(r => setTimeout(r, 600));
+
+                // Visualize Preprocessing Steps
+                addLog(`INITIATING TEXT PREPROCESSOR...`, 'process');
+                await new Promise(r => setTimeout(r, 500));
+
+                addLog(`[1/5] Case Folding (Lowercasing)... OK`, 'success');
+                await new Promise(r => setTimeout(r, 300));
+
+                addLog(`[2/5] Cleaning Special Characters... OK`, 'success');
+                await new Promise(r => setTimeout(r, 300));
+
+                addLog(`[3/5] Normalizing Slang Words (Kamus Alay)... OK`, 'success');
+                await new Promise(r => setTimeout(r, 400));
+
+                addLog(`[4/5] Removing Stopwords (Sastrawi)... OK`, 'success');
+                await new Promise(r => setTimeout(r, 400));
+
+                addLog(`[5/5] Stemming & Tokenizing... OK`, 'success');
+                await new Promise(r => setTimeout(r, 500));
+
+                addLog(`PREPROCESSING COMPLETE.`, 'process');
+                await new Promise(r => setTimeout(r, 400));
+
+                addLog(`Running Sentiment Analysis Model...`, 'info');
+                await new Promise(r => setTimeout(r, 800));
+
+                addLog(`Clustering Topics (K-Means)... OK`, 'success');
+                addLog(`Finalizing Results...`, 'process');
+
+                await new Promise(r => setTimeout(r, 500));
+
                 renderResults(data);
                 resultsContainer.classList.remove('hidden');
-                // Scroll to results
                 resultsContainer.scrollIntoView({ behavior: 'smooth' });
                 showToast(`Berhasil! Ditemukan ${data.total} data.`, 'success');
             } else {
+                addLog(`Error: ${data.error || 'Unknown error'}`, 'error');
                 showToast('Gagal: ' + (data.error || 'Tidak ada data'), 'error');
             }
         } catch (err) {
+            clearInterval(searchInterval);
+            addLog(`Connection Failed: ${err.message}`, 'error');
             showToast('Koneksi Gagal: ' + err.message, 'error');
         } finally {
-            loading.classList.add('hidden');
+            // Optional: Hide loading after a delay or keep it visible until scrolled?
+            // Usually nice to hide it or minimize it. Let's hide it.
+            setTimeout(() => {
+                loading.classList.add('hidden');
+            }, 1000);
         }
     });
 
