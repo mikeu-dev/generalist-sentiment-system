@@ -5,6 +5,8 @@ from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFacto
 import logging
 from typing import List
 
+from modules.slang_dict import SLANG_DICT
+
 logger = logging.getLogger(__name__)
 
 class TextPreprocessor:
@@ -58,10 +60,24 @@ class TextPreprocessor:
         # Stopword removal
         text = self.stopword_remover.remove(text)
         
+        # Slang Normalization (New)
+        text = self.normalize_slang(text)
+        
         # Stemming with cache
         text = self.cached_stem(text)
         
         return text
+
+    def normalize_slang(self, text: str) -> str:
+        """
+        Mengubah kata slang/alay menjadi kata baku berdasarkan dictionary.
+        """
+        if not text:
+            return ""
+        
+        words = text.split()
+        normalized_words = [SLANG_DICT.get(word, word) for word in words]
+        return ' '.join(normalized_words)
 
     def preprocess_batch(self, texts: List[str]) -> List[str]:
         """

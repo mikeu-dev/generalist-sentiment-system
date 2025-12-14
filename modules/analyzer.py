@@ -1,4 +1,5 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import GridSearchCV
 from sklearn.svm import LinearSVC
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.cluster import KMeans
@@ -53,15 +54,43 @@ class SentimentAnalyzer:
 
     def train(self, texts: List[str], labels: List[str]) -> None:
         """
-        Melatih model Naive Bayes dengan data berlabel.
+        Melatih model dengan GridSearchCV untuk mencari hyperparameter optimal.
         """
-        logger.info("Training model...")
+        logger.info(f"Training model with {len(texts)} data points...")
         try:
             X = self.vectorizer.fit_transform(texts)
+            
+            # Define Parameter Grid for LinearSVC
+            param_grid = {
+                'C': [0.01, 0.1, 1, 10],
+                'class_weight': [None, 'balanced']
+            }
+            
+            # Grid Search
+            logger.info("Starting GridSearchCV for hyperparameter tuning...")
+            grid = GridSearchCV(
+                LinearSVC(random_state=42, max_iter=2000), 
+                param_grid, 
+                cv=5, 
+                n_jobs=-1,
+                scoring='accuracy'
+            )
+            grid.fit(X, labels)
+            
+            best_model = grid.best_estimator_
+            logger.info(f"Best parameters found: {grid.best_params_}")
+            logger.info(f"Best CV Score: {grid.best_score_:.4f}")
+            
+            # Wrap in CalibratedClassifierCV for probability outputs
+            # We refit on the whole dataset to ensure calibration uses all data
+            self.classifier = CalibratedClassifierCV(best_model, cv=5)
             self.classifier.fit(X, labels)
+            
             self.is_trained = True
+            self.current_model_version = f"v1.0.0_tuned_{grid.best_params_['C']}"
             self.save_model()
-            logger.info("Model trained and saved.")
+            logger.info("Model tuned, calibrated, trained, and saved.")
+            
         except Exception as e:
             logger.error(f"Error during training: {e}")
             raise
