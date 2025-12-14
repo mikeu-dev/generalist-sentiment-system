@@ -81,8 +81,15 @@ header h1 {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* File Upload */
@@ -138,7 +145,8 @@ header h1 {
 }
 
 /* Buttons */
-.btn-primary, .btn-secondary {
+.btn-primary,
+.btn-secondary {
     display: inline-block;
     padding: 12px 30px;
     color: white;
@@ -194,7 +202,7 @@ header h1 {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     text-align: center;
     border: 1px solid var(--border-color);
 }
@@ -248,7 +256,8 @@ table {
     margin-top: 10px;
 }
 
-th, td {
+th,
+td {
     padding: 12px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -263,4 +272,70 @@ th {
     color: var(--warning-color);
     font-style: italic;
     font-size: 0.9rem;
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    background-color: white;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 300px;
+    animation: slideIn 0.3s ease;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+}
+
+.toast.success {
+    border-left-color: var(--success-color);
+}
+
+.toast.error {
+    border-left-color: #ef4444;
+}
+
+.toast-message {
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #94a3b8;
+    margin-left: 10px;
+}
+
+.toast-close:hover {
+    color: var(--text-color);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }

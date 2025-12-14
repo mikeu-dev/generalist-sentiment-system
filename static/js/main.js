@@ -1,3 +1,40 @@
+// Toast Notification System
+function showToast(message, type = 'info') {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    // Add show class after a small delay for transition
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    toast.innerHTML = `
+        <span class="toast-message">${message}</span>
+        <button class="toast-close">&times;</button>
+    `;
+
+    // Close button
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    });
+
+    // Auto close
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+
+    container.appendChild(toast);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // File Input Helper
     const fileInputs = document.querySelectorAll('.file-input');
@@ -30,11 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 renderResults(data);
                 resultsContainer.classList.remove('hidden');
+                showToast(`Analisis berhasil! ${data.total} data diproses.`, 'success');
             } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
+                showToast('Error: ' + (data.error || 'Unknown error'), 'error');
             }
         } catch (err) {
-            alert('Request failed: ' + err.message);
+            showToast('Request failed: ' + err.message, 'error');
         } finally {
             loading.classList.add('hidden');
         }
@@ -50,6 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loading.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
+
+        // Indikator "Sedang mencari..."
+        showToast(`Mencari data tentang "${query}"...`, 'info');
 
         try {
             const response = await fetch('/search_and_analyze', {
@@ -67,11 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsContainer.classList.remove('hidden');
                 // Scroll to results
                 resultsContainer.scrollIntoView({ behavior: 'smooth' });
+                showToast(`Berhasil! Ditemukan ${data.total} data.`, 'success');
             } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
+                showToast('Gagal: ' + (data.error || 'Tidak ada data'), 'error');
             }
         } catch (err) {
-            alert('Request failed: ' + err.message);
+            showToast('Koneksi Gagal: ' + err.message, 'error');
         } finally {
             loading.classList.add('hidden');
         }
@@ -100,12 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultDiv.innerHTML = `<div class="alert-success" style="color: green; margin-top: 10px;">${data.message} (${data.data_count} data)</div>`;
                 document.getElementById('model-status').textContent = "Siap Digunakan";
                 document.getElementById('model-status').className = "status-ready";
+                showToast(data.message, 'success');
             } else {
                 resultDiv.innerHTML = `<div class="alert-error" style="color: red; margin-top: 10px;">Error: ${data.error}</div>`;
+                showToast('Training Gagal: ' + data.error, 'error');
             }
             resultDiv.classList.remove('hidden');
         } catch (err) {
-            alert('Request failed: ' + err.message);
+            showToast('Request failed: ' + err.message, 'error');
         } finally {
             loading.classList.add('hidden');
         }
