@@ -25,7 +25,11 @@ def run_training_background(filepath, app_config_upload_folder):
         manager.update_status(progress=10, message="Membaca file dataset...")
         
         if filepath.endswith('.csv'):
-            df = pd.read_csv(filepath)
+            try:
+                df = pd.read_csv(filepath)
+            except Exception:
+                manager.update_status(progress=15, message="Menggunakan mode baca robust (format CSV kompleks)...")
+                df = pd.read_csv(filepath, engine='python', on_bad_lines='skip', quotechar='"', encoding_errors='ignore')
         elif filepath.endswith('.xlsx'):
             df = pd.read_excel(filepath)
         else:

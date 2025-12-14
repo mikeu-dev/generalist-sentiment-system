@@ -150,7 +150,12 @@ def analyze():
 
         try:
             if filepath.endswith('.csv'):
-                df = pd.read_csv(filepath)
+                try:
+                    df = pd.read_csv(filepath)
+                except Exception:
+                    # Fallback for parsing errors (e.g. quote mismatch)
+                    logger.warning("Standard CSV read failed, trying robust mode...")
+                    df = pd.read_csv(filepath, engine='python', on_bad_lines='skip', quotechar='"', encoding_errors='ignore')
             elif filepath.endswith('.xlsx'):
                 df = pd.read_excel(filepath)
             else:
