@@ -295,6 +295,8 @@ function renderResults(data) {
         const safeCluster = item.cluster !== undefined ? 'Cluster ' + escapeHtml(item.cluster) : '-';
         const safeSentiment = escapeHtml(item.sentiment || '-');
 
+        const safePreprocessed = escapeHtml(item.preprocessed || '-');
+
         let sourceHtml = '-';
         if (item.source) {
             if (item.source.startsWith('http')) {
@@ -308,6 +310,7 @@ function renderResults(data) {
 
         tr.innerHTML = `
             <td>${shortText}</td>
+            <td style="color: #6b7280; font-style: italic;">${safePreprocessed}</td>
             <td>${sourceHtml}</td>
             <td>${safeSentiment}</td>
             <td>${safeCluster}</td>

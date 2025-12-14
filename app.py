@@ -218,7 +218,8 @@ def analyze():
                         "cluster": cluster_id,
                         "score": detail['sentiment_score'],
                         "source": file.filename,
-                        "title": "File Upload"
+                        "title": "File Upload",
+                        "preprocessed": clean_texts[i]
                     })
                 
                 # Distribution stats
@@ -349,7 +350,8 @@ def search_and_analyze():
                     "sentiment": detail['label'],
                     "cluster": cluster_id,
                     "source": source,
-                    "title": title
+                    "title": title,
+                    "preprocessed": clean_texts[i]
                 })
             
             # Stats
