@@ -12,73 +12,81 @@ class DatasetFinder:
     def search(self, query, max_results=30, retries=3):
         """
         Search for a topic and return a list of texts.
-        Includes retry mechanism and error handling.
+        Uses query expansion and multiple backends to maximize results.
         """
-        print(f"Searching for: {query}")
-        print(f"Max results: {max_results}")
-        results = []
+        print(f"Target results: {max_results}")
         
-        backends = ['auto', 'html', 'lite']
-        
-        for attempt in range(retries):
-            try:
-                # Iterate through backends
-                for backend in backends:
-                    print(f"  Attempt {attempt+1}/{retries} - Using backend='{backend}'...")
-                    try:
-                        ddg_results = self.ddgs.text(query, region='id-id', backend=backend, max_results=max_results)
-                        
-                        # Convert generator/list to list if needed and check contents
-                        # ddqs usually returns a generator or list of dicts
-                        if ddg_results:
-                            current_batch = []
-                            for res in ddg_results:
-                                item = {}
-                                if 'body' in res:
-                                    item['text'] = res['body']
-                                elif 'snippet' in res:
-                                    item['text'] = res['snippet']
-                                else:
-                                    continue
-                                
-                                item['source'] = res.get('href', 'Unknown')
-                                item['title'] = res.get('title', 'No Title')
-                                current_batch.append(item)
-                            
-                            if current_batch:
-                                results.extend(current_batch)
-                                print(f"    Backend '{backend}' found {len(current_batch)} results.")
-                                break # Stop trying backends if we found something
-                            else:
-                                print(f"    Backend '{backend}' returned empty content.")
-                        else:
-                             print(f"    Backend '{backend}' returned no results.")
-                             
-                    except Exception as b_error:
-                        print(f"    Backend '{backend}' error: {b_error}")
-                        time.sleep(1) # Short pause between backends
-                
-                if results:
-                    break # Stop retrying if we have results
-                
-                print(f"  No results found in attempt {attempt+1}. Waiting before retry...")
-                time.sleep(2 * (attempt + 1)) # Exponential backoff
-                
-            except Exception as e:
-                print(f"Search loop error: {e}")
-                time.sleep(2)
-
-        # Scrape / cleaning logic fallback? 
-        # For now just return what we have.
-        
-        # Remove duplicates based on text
-        seen_texts = set()
         unique_results = []
-        for r in results:
-            if r['text'] not in seen_texts:
-                seen_texts.add(r['text'])
-                unique_results.append(r)
+        seen_texts = set()
+        
+        # Prepare content variations to fetch more data
+        queries = [query]
+        if max_results > 40:
+            queries.extend([f"{query} berita", f"{query} opini", f"{query} terkini", f"{query} analisis"])
+        
+        for q_idx, current_query in enumerate(queries):
+            if len(unique_results) >= max_results:
+                break
                 
+            print(f"Processing query variant {q_idx+1}/{len(queries)}: '{current_query}'")
+            
+            # Search for current_query
+            backends = ['auto', 'html', 'lite']
+            current_found = False
+            
+            for attempt in range(retries):
+                try:
+                    for backend in backends:
+                        if len(unique_results) >= max_results:
+                            break
+                            
+                        print(f"  Attempt {attempt+1}/{retries} - Backend '{backend}'...")
+                        try:
+                            # Fetch batch
+                            ddg_results = self.ddgs.text(current_query, region='id-id', backend=backend, max_results=max_results)
+                            
+                            if ddg_results:
+                                count_before = len(unique_results)
+                                for res in ddg_results:
+                                    if len(unique_results) >= max_results:
+                                        break
+                                        
+                                    text = res.get('body') or res.get('snippet')
+                                    if not text:
+                                        continue
+                                        
+                                    if text not in seen_texts:
+                                        seen_texts.add(text)
+                                        item = {
+                                            'text': text,
+                                            'source': res.get('href', 'Unknown'),
+                                            'title': res.get('title', 'No Title')
+                                        }
+                                        unique_results.append(item)
+                                
+                                count_after = len(unique_results)
+                                new_items = count_after - count_before
+                                print(f"    Backend '{backend}' added {new_items} unique items.")
+                                
+                                if new_items > 0:
+                                    current_found = True
+                            else:
+                                print(f"    Backend '{backend}' returned no results.")
+                                
+                        except Exception as b_error:
+                            print(f"    Backend '{backend}' error: {b_error}")
+                            time.sleep(1)
+                    
+                    if current_found:
+                        break # Move to next query variant if we found something for this one
+                    
+                    print(f"  No results for '{current_query}' in attempt {attempt+1}. Retry...")
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    print(f"  Search error: {e}")
+                    time.sleep(1)
+                    
         return unique_results
 
 if __name__ == "__main__":
