@@ -32,13 +32,18 @@ class SentimentAnalyzer:
         Memprediksi sentimen ulasan.
         Jika model belum dilatih, gunakan Rule-based (Lexicon).
         """
+        print(f"DEBUG: predict called. is_trained={self.is_trained}")
+        
         if self.is_trained:
             # Machine Learning Prediction
+            print("DEBUG: Using ML Model.")
             X = self.vectorizer.transform(texts)
-            return self.classifier.predict(X)
+            res = self.classifier.predict(X)
+            print(f"DEBUG: ML Result sample: {res[:5]}")
+            return res
         else:
             # Fallback: Rule-based Prediction
-            print("Model not trained using Lexicon-based prediction.")
+            print("DEBUG: Using Lexicon Fallback.")
             results = []
             for text in texts:
                 score = 0
@@ -55,6 +60,8 @@ class SentimentAnalyzer:
                     results.append("negatif")
                 else:
                     results.append("netral")
+            
+            print(f"DEBUG: Lexicon Result sample: {results[:5]}")
             return results
 
     def cluster_topics(self, texts, n_clusters=3):
