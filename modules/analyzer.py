@@ -5,6 +5,8 @@ import pandas as pd
 import pickle
 import os
 
+from modules.lexicon_data import POSITIVE_WORDS, NEGATIVE_WORDS
+
 class SentimentAnalyzer:
     def __init__(self, model_path='model_data.pkl'):
         self.vectorizer = TfidfVectorizer()
@@ -28,12 +30,32 @@ class SentimentAnalyzer:
     def predict(self, texts):
         """
         Memprediksi sentimen ulasan.
+        Jika model belum dilatih, gunakan Rule-based (Lexicon).
         """
-        if not self.is_trained:
-            raise Exception("Model belum dilatih. Silakan train model terlebih dahulu.")
-        
-        X = self.vectorizer.transform(texts)
-        return self.classifier.predict(X)
+        if self.is_trained:
+            # Machine Learning Prediction
+            X = self.vectorizer.transform(texts)
+            return self.classifier.predict(X)
+        else:
+            # Fallback: Rule-based Prediction
+            print("Model not trained using Lexicon-based prediction.")
+            results = []
+            for text in texts:
+                score = 0
+                words = text.split()
+                for word in words:
+                    if word in POSITIVE_WORDS:
+                        score += 1
+                    elif word in NEGATIVE_WORDS:
+                        score -= 1
+                
+                if score > 0:
+                    results.append("positif")
+                elif score < 0:
+                    results.append("negatif")
+                else:
+                    results.append("netral")
+            return results
 
     def cluster_topics(self, texts, n_clusters=3):
         """
@@ -46,19 +68,25 @@ class SentimentAnalyzer:
              try:
                  X = self.vectorizer.transform(texts)
              except Exception:
-                 # Fallback: jika word di text baru tidak ada di vocab lama sama sekali
-                 # atau terjadi mismatch feature, kita fit ulang khusus untuk sesi unsupervised ini
-                 # Catatan: ini tidak mengubah self.vectorizer utama jika kita buat instance baru, 
-                 # tapi untuk simplifikasi kita fit_transform temp vectorizer atau handle error
-                 print("Warning: Vocabulary mismatch or empty, creating temporary vectorizer for clustering.")
+                 # Fallback
                  temp_vectorizer = TfidfVectorizer()
                  X = temp_vectorizer.fit_transform(texts)
         else:
              # Jika belum fit sama sekali (belum ada model), kita fit dengan data ini
-             X = self.vectorizer.fit_transform(texts)
+             # Tapi jangan simpan ke self.vectorizer agar tidak merusak training masa depan
+             # Gunakan temporary vectorizer
+             temp_vectorizer = TfidfVectorizer()
+             X = temp_vectorizer.fit_transform(texts)
             
-        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        clusters = self.kmeans.fit_predict(X)
+        # Ensure distinct clusters if N > samples
+        n_samples = X.shape[0]
+        actual_k = min(n_clusters, n_samples)
+        if actual_k < 2:
+             # Too few samples to cluster meaningfully, return all 0
+             return [0] * n_samples
+
+        kmeans_local = KMeans(n_clusters=actual_k, random_state=42)
+        clusters = kmeans_local.fit_predict(X)
         return clusters
 
     def feature_extraction(self, texts):

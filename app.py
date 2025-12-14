@@ -46,6 +46,19 @@ def train():
             if 'text' not in df.columns or 'label' not in df.columns:
                 return jsonify({"error": "Dataset harus memiliki kolom 'text' dan 'label'."}), 400
             
+            # Remove rows with empty labels or text
+            initial_count = len(df)
+            df = df.dropna(subset=['text', 'label'])
+            # Filter out empty strings or just whitespace
+            df = df[df['text'].astype(str).str.strip() != '']
+            df = df[df['label'].astype(str).str.strip() != '']
+            
+            cleaned_count = len(df)
+            if cleaned_count == 0:
+                return jsonify({"error": "Dataset tidak memiliki data valid (label tidak boleh kosong)."}), 400
+                
+            print(f"Dropped {initial_count - cleaned_count} invalid rows.")
+            
             # Preprocessing
             print("Preprocessing data for training...")
             # Sample for quick response if dataset is huge, but we need full training
@@ -58,7 +71,7 @@ def train():
             analyzer.train(clean_texts, labels)
             
             return jsonify({
-                "message": "Model berhasil dilatih!",
+                "message": f"Model berhasil dilatih! ({initial_count - cleaned_count} data tidak valid dibuang)",
                 "data_count": len(texts),
                 "is_trained": True
             })
@@ -178,16 +191,27 @@ def search_and_analyze():
             "clusters": []
         }
         
-        # 3. Predict Sentiment (using existing model)
-        if analyzer.is_trained:
+        # 3. Predict Sentiment (using existing model or lexicon)
+        # Always try to predict (analyzer now handles fallback)
+        try:
             predictions = analyzer.predict(clean_texts)
             # Make a temporary DF for easy grouping
             df_temp = pd.DataFrame({'text': raw_texts, 'sentiment': predictions})
             
             dist = df_temp['sentiment'].value_counts().to_dict()
             results['distribution'] = dist
-        else:
-             results['warning'] = "Model belum dilatih. Sentimen tidak diprediksi."
+            
+            if not analyzer.is_trained:
+                 results['method'] = "lexicon_fallback"
+                 print("Using Lexicon Method (Bootstrap)")
+            else:
+                 results['method'] = "model_prediction"
+
+        except Exception as e:
+             results['warning'] = f"Gagal memprediksi: {str(e)}"
+             print(f"Prediction error: {e}")
+
+        # 4. Clustering
 
         # 4. Clustering
         try:
@@ -202,7 +226,7 @@ def search_and_analyze():
                 preview_data = []
                 for i, text in enumerate(raw_texts[:100]): # Limit 100
                     item = {"text": text}
-                    if analyzer.is_trained:
+                    if 'predictions' in locals():
                         item['sentiment'] = predictions[i]
                     item['cluster'] = int(clusters[i])
                     preview_data.append(item)
