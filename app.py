@@ -145,6 +145,10 @@ def analyze():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
         
+        # Check for model type
+        model_type = request.form.get('model_type', 'default')
+        use_hf = (model_type == 'hf')
+
         try:
             if filepath.endswith('.csv'):
                 df = pd.read_csv(filepath)
@@ -174,8 +178,8 @@ def analyze():
             # Sentiment Prediction
             # Sentiment Prediction & Clustering
             # We use predict_detailed to get full info
-            logger.info("Predicting sentiment detailed...")
-            details = analyzer.predict_detailed(clean_texts)
+            logger.info(f"Predicting sentiment detailed... Use HF: {use_hf}")
+            details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
             
             # Clustering
             logger.info("Clustering topics...")
@@ -260,6 +264,9 @@ def search_and_analyze():
         logger.info("Searching web...")
         raw_texts = dataset_finder.search(query, max_results=50)
         
+        model_type = data.get('model_type', 'default')
+        use_hf = (model_type == 'hf')
+        
         if not raw_texts:
             return jsonify({"error": "Tidak ada data ditemukan untuk topik tersebut."}), 404
             
@@ -277,7 +284,7 @@ def search_and_analyze():
         # 3. Predict Sentiment (using existing model or lexicon)
         # Always try to predict (analyzer now handles fallback)
         # 3. Predict & Cluster & Save
-        details = analyzer.predict_detailed(clean_texts)
+        details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
         clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
         
         preview_data = []

@@ -11,6 +11,11 @@ import logging
 from typing import List, Union, Dict, Any
 
 from modules.lexicon_data import POSITIVE_WORDS, NEGATIVE_WORDS
+try:
+    from transformers import pipeline
+    HF_AVAILABLE = True
+except ImportError:
+    HF_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,22 @@ class SentimentAnalyzer:
             
         self.is_trained: bool = False
         self.current_model_version = "v0.0.0"
+        self.hf_classifier = None
         self.load_model()
+
+    def init_hf_model(self, model_name="w11wo/indonesian-roberta-base-sentiment-classifier"):
+        if not HF_AVAILABLE:
+            logger.warning("Transformers library not installed. Cannot load HF model.")
+            return False
+            
+        try:
+            logger.info(f"Loading Hugging Face model: {model_name}")
+            self.hf_classifier = pipeline("sentiment-analysis", model=model_name, tokenizer=model_name)
+            logger.info("Hugging Face model loaded successfully.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load HF model: {e}")
+            return False
 
     def train(self, texts: List[str], labels: List[str]) -> None:
         """
@@ -53,11 +73,14 @@ class SentimentAnalyzer:
         details = self.predict_detailed(texts)
         return [d['label'] for d in details]
 
-    def predict_detailed(self, texts: List[str]) -> List[Dict[str, Any]]:
+    def predict_detailed(self, texts: List[str], use_hf: bool = False) -> List[Dict[str, Any]]:
         """
         Returns detailed prediction with confidence and scores.
         """
-        logger.debug(f"predict_detailed called. is_trained={self.is_trained}")
+        logger.debug(f"predict_detailed called. is_trained={self.is_trained}, use_hf={use_hf}")
+        
+        if use_hf:
+            return self.predict_detailed_hf(texts)
         
         if not texts:
             return []
@@ -161,6 +184,70 @@ class SentimentAnalyzer:
                     "sentiment_score": float(norm_score),
                     "model_version": "lexicon_rule_based"
                 })
+            
+        return results
+
+    def predict_detailed_hf(self, texts: List[str]) -> List[Dict[str, Any]]:
+        """
+        Predict utilizing Hugging Face Pipeline
+        """
+        if not self.hf_classifier:
+             if not self.init_hf_model():
+                 # Fallback to standard if init fails
+                 logger.warning("HF Init failed, falling back to standard.")
+                 return self.predict_detailed(texts, use_hf=False)
+        
+        results = []
+        try:
+            # Pipeline is usually 1 text at a time or batch. 
+            # w11wo/indonesian-roberta-base-sentiment-classifier returns labels like 'positive', 'neutral', 'negative'
+            # Note: The model specific labels might be LABEL_0, LABEL_1 etc. We need to check or map.
+            # Assuming 'positive', 'negative', 'neutral' or similar for this specific model.
+            
+            # Batch processing for efficiency
+            predictions = self.hf_classifier(texts)
+            
+            for i, pred in enumerate(predictions):
+                # pred is usually {'label': 'ERROR', 'score': 0.99}... need to map
+                label_raw = pred['label']
+                confidence = pred['score']
+                
+                # Normalize Label
+                label = 'netral'
+                score = 0.0
+                
+                if 'positive' in label_raw.lower():
+                    label = 'positif'
+                    score = confidence
+                elif 'negative' in label_raw.lower():
+                    label = 'negatif'
+                    score = -confidence
+                elif 'neutral' in label_raw.lower():
+                    label = 'netral'
+                    score = 0.0
+                
+                # Check for LABEL_0 style if needed
+                if label_raw == 'LABEL_0': # Often positive
+                     label = 'positif'
+                     score = confidence
+                elif label_raw == 'LABEL_1': # Often neutral
+                     label = 'netral'
+                     score = 0.0
+                elif label_raw == 'LABEL_2': # Often negative
+                     label = 'negatif'
+                     score = -confidence
+                     
+                results.append({
+                    "label": label,
+                    "confidence_score": confidence,
+                    "sentiment_score": score,
+                    "model_version": f"hf_{self.hf_classifier.model.name_or_path}"
+                })
+                
+        except Exception as e:
+            logger.error(f"HF Prediction Error: {e}")
+            # Fallback
+            return self.predict_detailed(texts, use_hf=False)
             
         return results
 
