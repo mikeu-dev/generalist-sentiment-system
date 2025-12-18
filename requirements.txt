@@ -10,8 +10,11 @@ ddgs
 beautifulsoup4
 requests
 pytest
+pytest-cov
 gunicorn
 flask-sqlalchemy
+flask-limiter
+bleach
 transformers==4.35.2
 torch>=2.2.0
 flasgger>=0.9.0
