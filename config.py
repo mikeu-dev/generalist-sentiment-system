@@ -35,6 +35,33 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    
+    # Data Source Configuration
+    DATA_SOURCES = {
+        'twitter': {
+            'enabled': os.environ.get('TWITTER_ENABLED', 'True').lower() == 'true',
+            'rate_limit': int(os.environ.get('TWITTER_RATE_LIMIT', '15')),
+            'timeout': int(os.environ.get('TWITTER_TIMEOUT', '30'))
+        },
+        'reddit': {
+            'enabled': os.environ.get('REDDIT_ENABLED', 'False').lower() == 'true',
+            'client_id': os.environ.get('REDDIT_CLIENT_ID', ''),
+            'client_secret': os.environ.get('REDDIT_CLIENT_SECRET', ''),
+            'user_agent': os.environ.get('REDDIT_USER_AGENT', 'SentimentAnalysisBot/1.0'),
+            'rate_limit': int(os.environ.get('REDDIT_RATE_LIMIT', '10')),
+            'timeout': int(os.environ.get('REDDIT_TIMEOUT', '30'))
+        },
+        'youtube': {
+            'enabled': os.environ.get('YOUTUBE_ENABLED', 'True').lower() == 'true',
+            'rate_limit': int(os.environ.get('YOUTUBE_RATE_LIMIT', '10')),
+            'timeout': int(os.environ.get('YOUTUBE_TIMEOUT', '30'))
+        },
+        'news_indonesia': {
+            'enabled': os.environ.get('NEWS_INDONESIA_ENABLED', 'True').lower() == 'true',
+            'rate_limit': int(os.environ.get('NEWS_INDONESIA_RATE_LIMIT', '5')),
+            'timeout': int(os.environ.get('NEWS_INDONESIA_TIMEOUT', '20'))
+        }
+    }
 
 class ProductionConfig(Config):
     """Production specific config."""

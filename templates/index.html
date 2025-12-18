@@ -55,6 +55,14 @@
                     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                         <input type="text" name="query" placeholder="Ketik topik atau kata kunci..." required
                             autocomplete="off" style="flex: 1;">
+
+                        <!-- Source Selector -->
+                        <select name="source" id="source-selector"
+                            style="width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                            <option value="all">Semua Sumber</option>
+                            <!-- Will be populated dynamically -->
+                        </select>
+
                         <select name="limit"
                             style="width: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
                             <option value="50">50 Data</option>

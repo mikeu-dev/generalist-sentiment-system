@@ -50,6 +50,9 @@ function selectModel(element, value) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Load available sources on page load
+    loadAvailableSources();
+
     // File Input Helper
     const fileInputs = document.querySelectorAll('.file-input');
     fileInputs.forEach(input => {
@@ -134,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     query: query,
+                    source: form.querySelector('select[name="source"]').value,
                     limit: form.querySelector('select[name="limit"]').value,
                     model_type: document.querySelector('input[name="model_type"]:checked')?.value || 'default'
                 })
@@ -556,4 +560,38 @@ function switchTab(tabName) {
     if (tabName === 'analyze') btns[0].classList.add('active');
     else if (tabName === 'search') btns[1].classList.add('active');
     else if (tabName === 'train') btns[2].classList.add('active');
+}
+
+// Load Available Data Sources
+async function loadAvailableSources() {
+    try {
+        const response = await fetch('/api/sources');
+        if (!response.ok) {
+            console.error('Failed to load sources');
+            return;
+        }
+
+        const data = await response.json();
+        const selector = document.getElementById('source-selector');
+
+        if (!selector) return;
+
+        // Clear existing options except "Semua Sumber"
+        selector.innerHTML = '';
+
+        // Add all sources
+        data.sources.forEach(source => {
+            if (source.enabled) {
+                const option = document.createElement('option');
+                option.value = source.id;
+                option.textContent = source.name;
+                selector.appendChild(option);
+            }
+        });
+
+        console.log('Loaded sources:', data.sources.filter(s => s.enabled).map(s => s.name).join(', '));
+    } catch (error) {
+        console.error('Error loading sources:', error);
+        // Fallback: keep default "Semua Sumber" option
+    }
 }

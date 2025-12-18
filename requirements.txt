@@ -9,6 +9,12 @@ wordcloud
 ddgs
 beautifulsoup4
 requests
+ntscraper>=0.3.0
+praw>=7.7.0
+youtube-comment-downloader>=0.1.73
+newspaper3k>=0.2.8
+feedparser>=6.0.0
+lxml>=4.9.0
 pytest
 pytest-cov
 gunicorn

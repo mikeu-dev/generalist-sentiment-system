@@ -327,6 +327,38 @@ from modules.dataset_finder import DatasetFinder
 # Inisialisasi DatasetFinder
 dataset_finder = DatasetFinder()
 
+@app.route('/api/sources', methods=['GET'])
+def get_sources():
+    """
+    Mendapatkan daftar sumber data yang tersedia.
+    ---
+    tags:
+      - Data Sources
+    responses:
+      200:
+        description: Daftar sumber data yang tersedia
+        schema:
+          type: object
+          properties:
+            sources:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  enabled:
+                    type: boolean
+    """
+    try:
+        sources = dataset_finder.get_available_sources()
+        return jsonify({"sources": sources})
+    except Exception as e:
+        logger.error(f"Error in get_sources endpoint: {e}", exc_info=True)
+        return jsonify({"error": "Terjadi kesalahan saat mengambil daftar sumber"}), 500
+
 @app.route('/search_and_analyze', methods=['POST'])
 @limiter.limit("5 per minute")  # Limit search lebih ketat karena hit external API
 def search_and_analyze():
@@ -367,6 +399,15 @@ def search_and_analyze():
         
         logger.info(f"Menerima query pencarian: {sanitized_query}")
         
+        # Validasi source parameter
+        source = data.get('source', 'all')
+        available_sources = [s['id'] for s in dataset_finder.get_available_sources()]
+        
+        if source not in available_sources:
+            return jsonify({
+                "error": f"Sumber '{source}' tidak valid. Pilih dari: {', '.join(available_sources)}"
+            }), 400
+        
         # Validasi limit parameter
         limit_val = data.get('limit', 100)
         validated_limit, limit_warning = validate_limit_parameter(limit_val, min_val=1, max_val=500, default=100)
@@ -374,9 +415,9 @@ def search_and_analyze():
         if limit_warning:
             logger.warning(limit_warning)
         
-        # 1. Pencarian
-        logger.info("Mencari di web...")
-        raw_texts = dataset_finder.search(sanitized_query, max_results=validated_limit)
+        # 1. Pencarian dengan sumber spesifik
+        logger.info(f"Mencari di '{source}'...")
+        raw_texts = dataset_finder.search(sanitized_query, source=source, max_results=validated_limit)
         
         model_type = data.get('model_type', 'default')
         use_hf = (model_type == 'hf')
@@ -396,6 +437,7 @@ def search_and_analyze():
         
         results = {
             "query": sanitized_query,
+            "source": source,
             "total": len(raw_texts), 
             "distribution": {}, 
             "clusters": []
