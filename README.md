@@ -4,6 +4,11 @@ Sistem analisis sentimen berbasis web yang dirancang untuk memproses ulasan berb
 
 ## 🚀 Fitur Utama
 
+-   **Pencarian Dataset Multi-Source**: Mencari dataset ulasan secara otomatis dari berbagai sumber:
+    -   **Web (DuckDuckGo)**: Pencarian umum.
+    -   **Berita Indonesia**: Kompas, Detik, CNN, Tempo.
+    -   **Media Sosial**: Twitter/X (via Nitter), YouTube Comments.
+    -   **Reddit**: Forum diskusi (memerlukan API Key).
 -   **Analisis Sentimen (Hybrid)**: Mendukung dua mode analisis:
     -   **Classic**: Naive Bayes (Cepat, efisien).
     -   **Advanced**: Hugging Face Transformers (Deep Learning, akurasi tinggi, konteks lebih baik).
@@ -48,6 +53,13 @@ Sistem analisis sentimen berbasis web yang dirancang untuk memproses ulasan berb
         ```
     -   **Windows**: Gunakan WSL atau download Redis installer.
     -   **Mac**: `brew install redis` && `brew services start redis`
+
+5.  **Konfigurasi Sumber Data (Opsional)**:
+    Salin file contoh environment variables:
+    ```bash
+    cp .env.example .env
+    ```
+    Edit file `.env` untuk mengaktifkan/menonaktifkan sumber data (Twitter, Reddit, YouTube) dan memasukkan API Key jika diperlukan (khusus Reddit).
 
 ## 🖥️ Cara Penggunaan
 
