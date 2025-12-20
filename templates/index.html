@@ -43,6 +43,9 @@
             <button class="tab-btn" onclick="switchTab('train')">
                 <i class="ph ph-brain"></i> Training Model
             </button>
+            <button class="tab-btn" onclick="switchTab('history')">
+                <i class="ph ph-clock-counter-clockwise"></i> Riwayat
+            </button>
         </div>
 
         <!-- Search Section -->
@@ -85,6 +88,34 @@
                             <!-- Log types will appear here -->
                         </div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="history-section" class="tab-content">
+            <div class="card">
+                <h2><i class="ph ph-clock-counter-clockwise"></i> Riwayat Analisis</h2>
+                <div class="table-responsive">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Sumber</th>
+                                <th>Teks Preview</th>
+                                <th>Sentimen</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- History items -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1rem;">
+                    <button class="btn-secondary" id="history-prev" disabled>Previous</button>
+                    <span id="history-page-info" style="align-self: center; color: var(--text-muted);">Page 1</span>
+                    <button class="btn-secondary" id="history-next">Next</button>
                 </div>
             </div>
         </section>

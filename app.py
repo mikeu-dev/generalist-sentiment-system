@@ -511,5 +511,43 @@ def search_and_analyze():
         logger.error(f"Error in search_and_analyze endpoint: {e}", exc_info=True)
         return jsonify({"error": "Terjadi kesalahan saat mencari dan menganalisis data"}), 500
 
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    """
+    Mendapatkan riwayat analisis sentimen (Paginated).
+    ---
+    tags:
+      - History
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+    responses:
+      200:
+        description: Daftar riwayat analisis
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        pagination = SentimentLog.query.order_by(SentimentLog.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            "items": [item.to_dict() for item in pagination.items],
+            "total": pagination.total,
+            "pages": pagination.pages,
+            "current_page": page
+        })
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}", exc_info=True)
+        return jsonify({"error": "Gagal mengambil riwayat"}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

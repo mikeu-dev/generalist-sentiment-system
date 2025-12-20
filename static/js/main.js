@@ -501,22 +501,48 @@ document.getElementById('download-btn').addEventListener('click', () => {
     showToast("Download dimulai!", "success");
 });
 
+// Chart.js Global Defaults for Dark/Glass Theme
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
 function renderSentimentChart(distribution) {
     const ctx = document.getElementById('sentimentChart').getContext('2d');
 
-    // Reset canvas to avoid overlap
     if (sentimentChart) sentimentChart.destroy();
 
     if (!distribution || Object.keys(distribution).length === 0) return;
 
     sentimentChart = new Chart(ctx, {
-        type: 'pie',
+        type: 'doughnut', // Doughnut looks better than Pie for modern UI
         data: {
             labels: Object.keys(distribution),
             datasets: [{
                 data: Object.values(distribution),
-                backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#4f46e5'], // Green, Red, Amber, Indigo
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.8)', // Green
+                    'rgba(239, 68, 68, 0.8)',  // Red
+                    'rgba(245, 158, 11, 0.8)', // Amber
+                    'rgba(79, 70, 229, 0.8)'   // Indigo
+                ],
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1,
+                hoverOffset: 4
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            },
+            cutout: '60%'
         }
     });
 }
@@ -537,15 +563,95 @@ function renderClusterChart(clusterCounts) {
             datasets: [{
                 label: 'Jumlah Ulasan',
                 data: Object.values(clusterCounts),
-                backgroundColor: '#6366f1'
+                backgroundColor: 'rgba(99, 102, 241, 0.7)', // Indigo-500 equivalent
+                borderColor: '#818cf8',
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                y: { beginAtZero: true }
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
             }
         }
     });
+}
+
+// Load History Logic
+let currentHistoryPage = 1;
+
+async function loadHistory(page = 1) {
+    const tbody = document.querySelector('#history-table tbody');
+    const prevBtn = document.getElementById('history-prev');
+    const nextBtn = document.getElementById('history-next');
+    const pageInfo = document.getElementById('history-page-info');
+
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
+
+    try {
+        const res = await fetch(`/api/history?page=${page}`);
+        const data = await res.json();
+
+        tbody.innerHTML = '';
+
+        if (data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Belum ada riwayat.</td></tr>';
+            return;
+        }
+
+        data.items.forEach(item => {
+            const date = new Date(item.created_at).toLocaleString('id-ID');
+            const shortText = item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text;
+            const score = (item.sentiment_score * 100).toFixed(1) + '%';
+
+            // Badge color based on label
+            let color = '#94a3b8';
+            if (item.label === 'positif') color = '#10b981';
+            else if (item.label === 'negatif') color = '#ef4444';
+            else if (item.label === 'netral') color = '#f59e0b';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="white-space: nowrap; color: #64748b; font-size: 0.85em;">${date}</td>
+                <td>${item.source || '-'}</td>
+                <td>${shortText}</td>
+                <td><span style="color: ${color}; font-weight: 600; text-transform: capitalize;">${item.label}</span></td>
+                <td>${score}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Pagination Controls
+        currentHistoryPage = data.current_page;
+        pageInfo.textContent = `Page ${data.current_page} of ${data.pages}`;
+
+        prevBtn.disabled = !data.items.length || data.current_page === 1;
+        nextBtn.disabled = !data.items.length || data.current_page === data.pages;
+
+        prevBtn.onclick = () => loadHistory(data.current_page - 1);
+        nextBtn.onclick = () => loadHistory(data.current_page + 1);
+
+    } catch (e) {
+        console.error("Failed to load history", e);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">Gagal memuat riwayat.</td></tr>';
+    }
 }
 
 function switchTab(tabName) {
@@ -556,10 +662,14 @@ function switchTab(tabName) {
 
     // Find button
     const btns = document.querySelectorAll('.tab-btn');
-    // 0: Analyze (Upload), 1: Search, 2: Train
+    // 0: Analyze (Upload), 1: Search, 2: Train, 3: History
     if (tabName === 'analyze') btns[0].classList.add('active');
     else if (tabName === 'search') btns[1].classList.add('active');
     else if (tabName === 'train') btns[2].classList.add('active');
+    else if (tabName === 'history') {
+        btns[3].classList.add('active');
+        loadHistory(); // Auto load
+    }
 }
 
 // Load Available Data Sources
