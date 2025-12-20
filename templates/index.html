@@ -49,22 +49,19 @@
         <section id="search-section" class="tab-content">
             <div class="card">
                 <h2><i class="ph ph-magnifying-glass"></i> Cari Dataset & Analisis Otomatis</h2>
-                <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15") untuk mencari data real-time dan menganalisis
-                    sentimennya.</p>
+                <p>Masukkan topik (misal: "Ibukota Baru", "iPhone 15") untuk mencari data real-time.</p>
                 <form id="search-form">
-                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
                         <input type="text" name="query" placeholder="Ketik topik atau kata kunci..." required
-                            autocomplete="off" style="flex: 1;">
+                            autocomplete="off" style="flex: 2; min-width: 200px;">
 
                         <!-- Source Selector -->
-                        <select name="source" id="source-selector"
-                            style="width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                        <select name="source" id="source-selector" style="flex: 1; min-width: 150px;">
                             <option value="all">Semua Sumber</option>
                             <!-- Will be populated dynamically -->
                         </select>
 
-                        <select name="limit"
-                            style="width: 120px; padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
+                        <select name="limit" style="flex: 0 0 120px;">
                             <option value="50">50 Data</option>
                             <option value="100" selected>100 Data</option>
                             <option value="200">200 Data</option>
@@ -75,13 +72,14 @@
                         <i class="ph ph-magnifying-glass"></i> Cari & Analisis
                     </button>
                 </form>
+
                 <div id="search-loading" class="loading hidden">
                     <div class="terminal-loader">
                         <div class="terminal-header">
                             <div class="terminal-dot red"></div>
                             <div class="terminal-dot yellow"></div>
                             <div class="terminal-dot green"></div>
-                            <span>System Process</span>
+                            <span>SYSTEM_PROCESS_MONITOR_v2.0</span>
                         </div>
                         <div class="terminal-window" id="process-log">
                             <!-- Log types will appear here -->
@@ -98,9 +96,11 @@
                 <p>Upload file CSV atau Excel yang berisi kolom ulasan untuk dianalisis.</p>
                 <form id="analyze-form">
                     <!-- Model Selection -->
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Pilih Model:</label>
-                        <div class="radio-group" style="display: flex; gap: 1rem;">
+                    <div class="form-group">
+                        <label
+                            style="font-weight: 600; display: block; margin-bottom: 0.75rem; color: var(--text-primary);">Pilih
+                            Model:</label>
+                        <div class="radio-group">
                             <label class="radio-card selected" onclick="selectModel(this, 'default')">
                                 <input type="radio" name="model_type" value="default" checked hidden>
                                 <span class="radio-title"><i class="ph ph-lightning"></i> Cepat (Naive Bayes)</span>
@@ -109,8 +109,8 @@
                             <label class="radio-card" onclick="selectModel(this, 'hf')">
                                 <input type="radio" name="model_type" value="hf" hidden>
                                 <span class="radio-title"><i class="ph ph-brain"></i> Akurat (Deep Learning)</span>
-                                <span class="radio-desc">Menggunakan Transformers. Lebih lambat tapi lebih
-                                    cerdas.</span>
+                                <span class="radio-desc">Menggunakan Transformers. Lebih cerdas namun proses lebih
+                                    lama.</span>
                             </label>
                         </div>
                     </div>
@@ -125,7 +125,9 @@
                         <i class="ph ph-lightning"></i> Analisis Sekarang
                     </button>
                 </form>
-                <div id="analyze-loading" class="loading hidden">Sedang memproses data...</div>
+                <div id="analyze-loading" class="loading hidden">
+                    <span>Sedang memproses data...</span>
+                </div>
             </div>
 
             <div id="results-container" class="hidden">
@@ -149,12 +151,16 @@
                 <div class="charts-grid">
                     <div class="chart-card">
                         <h3>Distribusi Sentimen</h3>
-                        <canvas id="sentimentChart"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="sentimentChart"></canvas>
+                        </div>
                         <p id="sentiment-warning" class="warning-text hidden">Model belum dilatih.</p>
                     </div>
                     <div class="chart-card">
                         <h3>Cluster Topik (K-Means)</h3>
-                        <canvas id="clusterChart"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="clusterChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -165,9 +171,9 @@
                             <thead>
                                 <tr>
                                     <th>Teks Ulasan</th>
-                                    <th>Teks Bersih (Preprocessed)</th>
+                                    <th>Preprocessing</th>
                                     <th>Sumber</th>
-                                    <th>Prediksi Sentimen</th>
+                                    <th>Sentimen</th>
                                     <th>Cluster</th>
                                 </tr>
                             </thead>
@@ -186,7 +192,7 @@
                 <h2><i class="ph ph-graduation-cap"></i> Training Model Baru</h2>
                 <p>Latih ulang model Naive Bayes dengan dataset khusus Anda.</p>
                 <div class="alert-info"
-                    style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 15px; margin-bottom: 20px; font-size: 0.9em; color: #1e3a8a;">
+                    style="background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; padding: 12px 16px; margin-bottom: 20px; font-size: 0.9em; border-radius: 4px; color: #93c5fd;">
                     <i class="ph ph-info" style="vertical-align: middle; margin-right: 5px;"></i>
                     Format wajib: Kolom <strong>text</strong> dan <strong>label</strong>.
                 </div>
@@ -206,21 +212,19 @@
 
                 <!-- Evaluation Metrics Section -->
                 <div id="train-metrics" class="hidden"
-                    style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                    style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 2rem;">
                     <h3><i class="ph ph-chart-bar"></i> Evaluasi Model</h3>
 
-                    <div class="metrics-grid"
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div class="metrics-grid" style="margin-bottom: 20px;">
                         <div class="metric-card"
-                            style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
-                            <div style="font-size: 0.9em; color: #166534;">Akurasi</div>
-                            <div id="metric-accuracy" style="font-size: 1.5em; font-weight: bold; color: #15803d;">-
-                            </div>
+                            style="background: rgba(22, 101, 52, 0.2); border-color: rgba(74, 222, 128, 0.2);">
+                            <div style="font-size: 0.9em; color: #86efac;">Akurasi</div>
+                            <div id="metric-accuracy" style="font-size: 2em; font-weight: bold; color: #4ade80;">-</div>
                         </div>
                         <div class="metric-card"
-                            style="background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe;">
-                            <div style="font-size: 0.9em; color: #1e40af;">Versi Model</div>
-                            <div id="metric-version" style="font-size: 1.2em; font-weight: bold; color: #1d4ed8;">-
+                            style="background: rgba(30, 64, 175, 0.2); border-color: rgba(96, 165, 250, 0.2);">
+                            <div style="font-size: 0.9em; color: #93c5fd;">Versi Model</div>
+                            <div id="metric-version" style="font-size: 1.5em; font-weight: bold; color: #60a5fa;">-
                             </div>
                         </div>
                     </div>
@@ -255,8 +259,8 @@
 
     <footer>
         <div class="container"
-            style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.9em;">
-            <p>&copy; 2025 Generalist Sentiment Analysis System. All rights reserved.</p>
+            style="text-align: center; color: var(--text-muted); padding: 3rem 0 2rem 0; font-size: 0.85em;">
+            <p>&copy; 2025 Generalist Sentiment Analysis System.</p>
         </div>
     </footer>
 
