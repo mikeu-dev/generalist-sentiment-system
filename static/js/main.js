@@ -691,3 +691,238 @@ async function loadAvailableSources() {
         // Fallback: keep default "Semua Sumber" option
     }
 }
+
+/* -----------------------------------------------------------
+   MONITORING DASHBOARD LOGIC
+   ----------------------------------------------------------- */
+
+// Modal Logic
+function openAddTopicModal() {
+    const modal = document.getElementById('add-topic-modal');
+    modal.classList.remove('hidden');
+    // slight delay for transition
+    setTimeout(() => modal.classList.add('active'), 10);
+}
+
+function closeAddTopicModal() {
+    const modal = document.getElementById('add-topic-modal');
+    modal.classList.remove('active');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+document.getElementById('add-topic-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const name = form.querySelector('input[name="name"]').value;
+    const query = form.querySelector('input[name="query"]').value;
+
+    try {
+        const res = await fetch('/api/monitoring/topics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, query })
+        });
+
+        if (res.ok) {
+            showToast('Topik berhasil ditambahkan!', 'success');
+            closeAddTopicModal();
+            form.reset();
+            loadMonitoredTopics(); // Refresh list
+        } else {
+            const err = await res.json();
+            showToast('Gagal: ' + err.error, 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+});
+
+let trendChart = null;
+
+async function loadMonitoredTopics() {
+    const grid = document.getElementById('monitoring-grid');
+    grid.innerHTML = '<div style="text-align:center; width:100%;">Loading...</div>';
+
+    try {
+        const res = await fetch('/api/monitoring/topics');
+        const topics = await res.json();
+
+        grid.innerHTML = '';
+
+        if (topics.length === 0) {
+            grid.innerHTML = '<div style="text-align:center; width:100%; color: var(--text-muted);">Belum ada topik yang dipantau.</div>';
+            return;
+        }
+
+        topics.forEach(topic => {
+            const card = document.createElement('div');
+            card.className = 'topic-card';
+            card.onclick = (e) => {
+                if (!e.target.closest('.delete-btn') && !e.target.closest('.refresh-btn')) {
+                    showTopicDetail(topic);
+                }
+            };
+
+            // Format Last Updated
+            let lastUpdated = topic.last_updated ? new Date(topic.last_updated).toLocaleString() : 'Belum update';
+
+            card.innerHTML = `
+                <div class="topic-header">
+                    <span class="topic-name">${topic.name}</span>
+                    <button class="delete-btn" onclick="deleteTopic(${topic.id})">&times;</button>
+                </div>
+                <div class="topic-query"><i class="ph ph-magnifying-glass"></i> "${topic.query}"</div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:end;">
+                    <div class="topic-meta">
+                        <i class="ph ph-clock"></i> ${lastUpdated}
+                    </div>
+                    <button class="btn-secondary refresh-btn" style="padding: 0.4rem 0.8rem; font-size: 0.8em; width: auto;" onclick="refreshTopic(${topic.id})">
+                        <i class="ph ph-arrows-clockwise"></i> Update
+                    </button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+    } catch (e) {
+        console.error(e);
+        grid.innerHTML = '<div style="text-align:center; color:red;">Gagal memuat topik.</div>';
+    }
+}
+
+async function deleteTopic(id) {
+    if (!confirm("Hapus topik ini?")) return;
+
+    try {
+        const res = await fetch(`/api/monitoring/topics/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast("Topik dihapus.", "success");
+            loadMonitoredTopics();
+        } else {
+            showToast("Gagal menghapus.", "error");
+        }
+    } catch (e) { showToast("Error: " + e.message, "error"); }
+}
+
+async function refreshTopic(id) {
+    showToast("Memulai update data...", "info");
+    try {
+        const res = await fetch(`/api/monitoring/topics/${id}/refresh`, { method: 'POST' });
+        if (res.ok) {
+            showToast("Update berjalan di background.", "success");
+            // Reload list after a delay to show update time if fast, 
+            // but manual reload might be better for user.
+            setTimeout(loadMonitoredTopics, 5000);
+        } else {
+            showToast("Gagal memulai update.", "error");
+        }
+    } catch (e) { showToast("Error: " + e.message, "error"); }
+}
+
+async function showTopicDetail(topic) {
+    const section = document.getElementById('monitoring-detail');
+    section.classList.remove('hidden');
+    document.getElementById('detail-topic-name').textContent = topic.name;
+    document.getElementById('detail-topic-query').textContent = `Query: ${topic.query}`;
+
+    // Load History
+    try {
+        const res = await fetch(`/api/monitoring/topics/${topic.id}/history`);
+        const snapshots = await res.json();
+
+        renderTrendChart(snapshots);
+
+        // Scroll to detail
+        section.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (e) {
+        console.error("Failed to load history", e);
+        showToast("Gagal memuat history chart.", "error");
+    }
+}
+
+function closeMonitoringDetail() {
+    document.getElementById('monitoring-detail').classList.add('hidden');
+}
+
+function renderTrendChart(snapshots) {
+    const ctx = document.getElementById('topicTrendChart').getContext('2d');
+
+    if (trendChart) trendChart.destroy();
+
+    const labels = snapshots.map(s => new Date(s.timestamp).toLocaleDateString() + ' ' + new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    const dataScores = snapshots.map(s => s.score_avg);
+    const dataPos = snapshots.map(s => s.positive);
+    const dataNeg = snapshots.map(s => s.negative);
+
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Avg Sentiment Score (-1 to 1)',
+                    data: dataScores,
+                    borderColor: '#818cf8',
+                    backgroundColor: 'rgba(129, 140, 248, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Positif (Count)',
+                    data: dataPos,
+                    borderColor: '#10b981',
+                    borderDash: [5, 5],
+                    tension: 0.4,
+                    pointStyle: 'rect',
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Negatif (Count)',
+                    data: dataNeg,
+                    borderColor: '#ef4444',
+                    borderDash: [5, 5],
+                    tension: 0.4,
+                    pointStyle: 'rect',
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    min: -1,
+                    max: 1,
+                    title: { display: true, text: 'Sentiment Score' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Volume' }
+                }
+            }
+        }
+    });
+}
+
+// Hook into switchTab to load topics when Monitoring tab is clicked
+const originalSwitchTab = window.switchTab;
+window.switchTab = function (tabName) {
+    originalSwitchTab(tabName);
+    if (tabName === 'monitoring') {
+        loadMonitoredTopics();
+    }
+}

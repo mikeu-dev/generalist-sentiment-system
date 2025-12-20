@@ -5,6 +5,8 @@ import pytest
 import io
 from app import app as flask_app
 from models.sentiment_log import db
+# Import all models to ensure db.create_all() works
+import models.topic_models
 
 
 @pytest.fixture
@@ -12,7 +14,17 @@ def app():
     """Fixture untuk Flask app dengan testing config"""
     flask_app.config['TESTING'] = True
     flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    flask_app.config['WTF_CSRF_ENABLED'] = False
+    flask_app.config['RATELIMIT_ENABLED'] = False
+    
+    # Disable limiter explicitly
+    from app import limiter, queue
+    limiter.enabled = False
+    
+    # Mock queue
+    from unittest.mock import MagicMock
+    mock_job = MagicMock()
+    mock_job.id = "mock-job-id"
+    queue.enqueue = MagicMock(return_value=mock_job)
     
     with flask_app.app_context():
         db.create_all()
@@ -186,3 +198,56 @@ class TestExportEndpoint:
             assert response.status_code == 200
             assert response.headers['Content-Type'] == 'application/pdf'
             assert f"attachment; filename=sentiment_report_{batch_id[:8]}.pdf" in response.headers['Content-Disposition']
+
+class TestMonitoringEndpoint:
+    def test_create_topic(self, client):
+        """Test membuat topik monitoring baru"""
+        response = client.post('/api/monitoring/topics', json={
+            'name': 'Test Topic',
+            'query': 'test query'
+        })
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['name'] == 'Test Topic'
+        assert data['query'] == 'test query'
+        assert 'id' in data
+
+    def test_list_topics(self, client):
+        """Test list topik"""
+        # Create one first
+        client.post('/api/monitoring/topics', json={'name': 'T1', 'query': 'Q1'})
+        
+        response = client.get('/api/monitoring/topics')
+        if response.status_code != 200:
+            print(f"DEBUG ERROR: {response.status_code}, {response.data}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+
+    def test_delete_topic(self, client):
+        """Test hapus topik"""
+        # Create
+        res = client.post('/api/monitoring/topics', json={'name': 'To Delete', 'query': 'QDel'})
+        topic_id = res.get_json()['id']
+        
+        # Delete
+        del_res = client.delete(f'/api/monitoring/topics/{topic_id}')
+        assert del_res.status_code == 200
+        
+        # Verify gone
+        get_res = client.get('/api/monitoring/topics')
+        topics = get_res.get_json()
+        assert not any(t['id'] == topic_id for t in topics)
+
+    def test_refresh_topic(self, client):
+        """Test refresh trigger"""
+        # Create
+        res = client.post('/api/monitoring/topics', json={'name': 'To Refresh', 'query': 'QRef'})
+        topic_id = res.get_json()['id']
+        
+        # Refresh
+        ref_res = client.post(f'/api/monitoring/topics/{topic_id}/refresh')
+        assert ref_res.status_code == 200
+        data = ref_res.get_json()
+        assert 'job_id' in data

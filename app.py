@@ -12,7 +12,8 @@ from models.sentiment_log import db, SentimentLog
 from flasgger import Swagger
 from rq import Queue
 from redis import Redis
-from modules.tasks import run_training_background
+from modules.tasks import run_training_background, update_topic_sentiment
+from models.topic_models import MonitoredTopic, TopicSnapshot
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from utils.security import (
@@ -647,6 +648,80 @@ def export_result(batch_id):
     except Exception as e:
         logger.error(f"Error exporting data: {e}", exc_info=True)
         return jsonify({"error": "Gagal mengekspor data"}), 500
+
+# ==========================================
+# MONITORING API
+# ==========================================
+
+@app.route('/api/monitoring/topics', methods=['GET'])
+def get_monitored_topics():
+    """Get all monitored topics."""
+    try:
+        topics = MonitoredTopic.query.order_by(MonitoredTopic.created_at.desc()).all()
+        return jsonify([t.to_dict() for t in topics])
+    except Exception as e:
+        logger.error(f"Error fetching topics: {e}")
+        return jsonify({"error": "Gagal mengambil daftar topik"}), 500
+
+@app.route('/api/monitoring/topics', methods=['POST'])
+def create_monitored_topic():
+    """Create a new monitored topic."""
+    try:
+        data = request.json
+        if not data or 'name' not in data or 'query' not in data:
+            return jsonify({"error": "Nama dan Query wajib diisi"}), 400
+            
+        topic = MonitoredTopic(name=data['name'], search_query=data['query'])
+        db.session.add(topic)
+        db.session.commit()
+        
+        # Trigger initial update immediately
+        queue.enqueue(update_topic_sentiment, topic.id, app.config['SQLALCHEMY_DATABASE_URI'])
+        
+        return jsonify(topic.to_dict()), 201
+    except Exception as e:
+        logger.error(f"Error creating topic: {e}")
+        return jsonify({"error": "Gagal membuat topik"}), 500
+
+@app.route('/api/monitoring/topics/<int:topic_id>', methods=['DELETE'])
+def delete_monitored_topic(topic_id):
+    """Delete a monitored topic."""
+    try:
+        topic = MonitoredTopic.query.get(topic_id)
+        if not topic:
+            return jsonify({"error": "Topik tidak ditemukan"}), 404
+            
+        db.session.delete(topic)
+        db.session.commit()
+        return jsonify({"message": "Topik berhasil dihapus"})
+    except Exception as e:
+        logger.error(f"Error deleting topic: {e}")
+        return jsonify({"error": "Gagal menghapus topik"}), 500
+
+@app.route('/api/monitoring/topics/<int:topic_id>/refresh', methods=['POST'])
+@limiter.limit("5 per minute")
+def refresh_topic(topic_id):
+    """Trigger update for a topic."""
+    try:
+        topic = MonitoredTopic.query.get(topic_id)
+        if not topic:
+            return jsonify({"error": "Topik tidak ditemukan"}), 404
+            
+        job = queue.enqueue(update_topic_sentiment, topic.id, app.config['SQLALCHEMY_DATABASE_URI'])
+        return jsonify({"message": "Update started (background)", "job_id": job.id})
+    except Exception as e:
+        logger.error(f"Error refreshing topic: {e}")
+        return jsonify({"error": "Gagal memulai update"}), 500
+
+@app.route('/api/monitoring/topics/<int:topic_id>/history', methods=['GET'])
+def get_topic_history(topic_id):
+    """Get history snapshots for a topic."""
+    try:
+        snapshots = TopicSnapshot.query.filter_by(topic_id=topic_id).order_by(TopicSnapshot.timestamp.asc()).all()
+        return jsonify([s.to_dict() for s in snapshots])
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}")
+        return jsonify({"error": "Gagal mengambil riwayat topik"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -46,6 +46,9 @@
             <button class="tab-btn" onclick="switchTab('history')">
                 <i class="ph ph-clock-counter-clockwise"></i> Riwayat
             </button>
+            <button class="tab-btn" onclick="switchTab('monitoring')">
+                <i class="ph ph-chart-line-up"></i> Monitoring
+            </button>
         </div>
 
         <!-- Search Section -->
@@ -119,6 +122,59 @@
                 </div>
             </div>
         </section>
+
+        <!-- Monitoring Section -->
+        <section id="monitoring-section" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2><i class="ph ph-chart-line-up"></i> Brand Monitoring</h2>
+                    <button class="btn-primary" onclick="openAddTopicModal()">
+                        <i class="ph ph-plus"></i> Tambah Topik
+                    </button>
+                </div>
+
+                <div id="monitoring-grid" class="monitoring-grid">
+                    <!-- Topic Cards will be injected here -->
+                    <div style="text-align: center; width: 100%; color: var(--text-muted); padding: 20px;">
+                        Belum ada topik yang dipantau.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monitoring Detail View (Hidden by default) -->
+            <div id="monitoring-detail" class="card hidden" style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <h3 id="detail-topic-name">Topic Name</h3>
+                        <p id="detail-topic-query" style="color: var(--text-muted); font-size: 0.9em;"></p>
+                    </div>
+                    <button class="btn-secondary" onclick="closeMonitoringDetail()">Tutup</button>
+                </div>
+
+                <div style="height: 300px; margin-top: 20px;">
+                    <canvas id="topicTrendChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add Topic Modal -->
+        <div id="add-topic-modal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeAddTopicModal()">&times;</span>
+                <h3>Tambah Topik Baru</h3>
+                <form id="add-topic-form" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Nama Topik (Display Name)</label>
+                        <input type="text" name="name" placeholder="Misal: Indomie" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Query Pencarian</label>
+                        <input type="text" name="query" placeholder="Misal: Indomie enak" required>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Simpan & Mulai Pantau</button>
+                </form>
+            </div>
+        </div>
 
         <!-- Analyze Section -->
         <section id="analyze-section" class="tab-content active">
