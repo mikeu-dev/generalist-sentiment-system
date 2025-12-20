@@ -22,6 +22,10 @@ from utils.security import (
     validate_limit_parameter,
     calculate_file_hash
 )
+from modules.exporter import Exporter
+import uuid
+import io
+from flask import send_file
 
 # Konfigurasi Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -61,6 +65,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 logger.info("Memuat modul...")
 preprocessor = TextPreprocessor()
 analyzer = SentimentAnalyzer()
+exporter = Exporter()
 logger.info("Modul berhasil dimuat.")
 
 # Register monitoring routes
@@ -259,6 +264,9 @@ def analyze():
         
         results = {"total": len(raw_texts), "distribution": {}, "clusters": []}
         
+        # Generate Batch ID
+        batch_id = str(uuid.uuid4())
+        
         # Prediksi Sentimen & Clustering
         logger.info(f"Memprediksi sentimen secara detail... Gunakan HF: {use_hf}")
         details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
@@ -283,7 +291,7 @@ def analyze():
                 confidence_score=detail['confidence_score'],
                 cluster=cluster_id,
                 source='file_upload',
-                metadata_json={'filename': safe_filename},
+                metadata_json={'filename': safe_filename, 'batch_id': batch_id},
                 model_version=detail['model_version']
             )
             db.session.add(log)
@@ -317,7 +325,8 @@ def analyze():
             "distribution": distribution,
             "cluster_counts": cluster_counts,
             "data": preview_data,
-            "model_version": details[0]['model_version'] if details else "unknown"
+            "model_version": details[0]['model_version'] if details else "unknown",
+            "batch_id": batch_id
         }
         
         if not analyzer.is_trained and details and details[0]['model_version'] == 'lexicon_rule_based':
@@ -458,6 +467,9 @@ def search_and_analyze():
             "clusters": []
         }
         
+        # Generate Batch ID
+        batch_id = str(uuid.uuid4())
+        
         # 3. Prediksi & Klaster & Simpan
         details = analyzer.predict_detailed(clean_texts, use_hf=use_hf)
         clusters = analyzer.cluster_topics(clean_texts, n_clusters=3)
@@ -482,7 +494,7 @@ def search_and_analyze():
                 confidence_score=detail['confidence_score'],
                 cluster=cluster_id,
                 source=source,
-                metadata_json={'query': sanitized_query, 'title': title},
+                metadata_json={'query': sanitized_query, 'title': title, 'batch_id': batch_id},
                 model_version=detail['model_version']
             )
             db.session.add(log)
@@ -509,6 +521,7 @@ def search_and_analyze():
         results['cluster_counts'] = cluster_counts
         results['data'] = preview_data
         results['method'] = "model_prediction" if analyzer.is_trained else "lexicon_fallback"
+        results['batch_id'] = batch_id
         
         if limit_warning:
             results['warning'] = limit_warning
@@ -563,6 +576,77 @@ def get_history():
     except Exception as e:
         logger.error(f"Error fetching history: {e}", exc_info=True)
         return jsonify({"error": "Gagal mengambil riwayat"}), 500
+
+@app.route('/api/export/<batch_id>', methods=['GET'])
+def export_result(batch_id):
+    """
+    Mengunduh hasil analisis dalam format Excel atau PDF.
+    ---
+    tags:
+      - Export
+    parameters:
+      - name: batch_id
+        in: path
+        type: string
+        required: true
+      - name: format
+        in: query
+        type: string
+        enum: ['excel', 'pdf']
+        default: 'excel'
+    responses:
+      200:
+        description: File hasil export
+      404:
+        description: Data tidak ditemukan
+    """
+    try:
+        export_format = request.args.get('format', 'excel')
+        
+        # Cari data berdasarkan batch_id di metadata_json
+        # Note: SQLite tidak punya fungsi JSON native yang standar di semua versi, tapi SQLAlchemy support
+        # Kita filter di python level saja jika batch_id tersimpan di dalam JSON string,
+        # tapi idealnya kita query dengan like atau search.
+        # Karena SentimentLog.metadata_json adalah JSONType (biasanya Text di SQLite), kita bisa query string matching.
+        
+        logs = SentimentLog.query.filter(SentimentLog.metadata_json.contains(batch_id)).all()
+        
+        if not logs:
+            return jsonify({"error": "Data tidak ditemukan"}), 404
+            
+        data = [log.to_dict() for log in logs]
+        
+        # Hitung Summary Stats
+        distribution = {}
+        for item in data:
+            lbl = item.get('label')
+            distribution[lbl] = distribution.get(lbl, 0) + 1
+            
+        summary_stats = {
+            "Total Data": len(data),
+            "distribution": distribution,
+            "Mode Sentimen": max(distribution, key=distribution.get) if distribution else "N/A"
+        }
+        
+        if export_format == 'pdf':
+            file_stream = exporter.export_to_pdf(data, summary_stats, batch_id)
+            mimetype = 'application/pdf'
+            filename = f"sentiment_report_{batch_id[:8]}.pdf"
+        else:
+            file_stream = exporter.export_to_excel(data, summary_stats)
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = f"sentiment_data_{batch_id[:8]}.xlsx"
+            
+        return send_file(
+            file_stream,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting data: {e}", exc_info=True)
+        return jsonify({"error": "Gagal mengekspor data"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

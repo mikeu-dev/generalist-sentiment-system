@@ -469,37 +469,23 @@ function renderResults(data) {
     }
 }
 
-// Export CSV Function
-document.getElementById('download-btn').addEventListener('click', () => {
-    if (!lastResultData || !lastResultData.data) {
-        showToast("Tidak ada data untuk diunduh.", "error");
+// Export Functions
+function triggerExport(format) {
+    if (!lastResultData || !lastResultData.batch_id) {
+        showToast("Data tidak tersedia untuk diekspor.", "error");
         return;
     }
 
-    const rows = [
-        ["text", "label", "cluster"] // Header matches training requirements
-    ];
+    const batchId = lastResultData.batch_id;
+    const url = `/api/export/${batchId}?format=${format}`;
 
-    lastResultData.data.forEach(item => {
-        // Escape quotes and handle newlines for CSV
-        const safeText = `"${item.text.replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-        rows.push([safeText, item.sentiment || "", item.cluster !== undefined ? item.cluster : ""]);
-    });
+    // Trigger download
+    window.location.href = url;
+    showToast(`Mengunduh laporan ${format.toUpperCase()}...`, "info");
+}
 
-    let csvContent = "data:text/csv;charset=utf-8,"
-        + rows.map(e => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    const filename = `dataset_${lastResultData.query || 'export'}_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.setAttribute("download", filename);
-    document.body.appendChild(link); // Required for FF
-    link.click();
-    document.body.removeChild(link);
-
-    showToast("Download dimulai!", "success");
-});
+document.getElementById('export-excel-btn').addEventListener('click', () => triggerExport('excel'));
+document.getElementById('export-pdf-btn').addEventListener('click', () => triggerExport('pdf'));
 
 // Chart.js Global Defaults for Dark/Glass Theme
 Chart.defaults.color = '#94a3b8';

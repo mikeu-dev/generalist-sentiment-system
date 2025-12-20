@@ -124,3 +124,65 @@ class TestTrainStatusEndpoint:
         assert response.status_code == 200
         data = response.get_json()
         assert 'is_training' in data
+
+class TestExportEndpoint:
+    def test_export_invalid_batch_id(self, client):
+        """Test export dengan batch_id yang tidak ada"""
+        response = client.get('/api/export/nonexistent_id')
+        assert response.status_code == 404
+    
+    def test_export_excel(self, client, app):
+        """Test export ke Excel"""
+        # Seed data
+        import uuid
+        from models.sentiment_log import SentimentLog, db
+        import json
+        
+        batch_id = str(uuid.uuid4())
+        log = SentimentLog(
+            text="Test export data",
+            label="positif",
+            sentiment_score=0.9,
+            confidence_score=0.95,
+            cluster=0,
+            source="test",
+            metadata_json=json.dumps({'batch_id': batch_id}),
+            model_version="test_v1"
+        )
+        with app.app_context():
+            db.session.add(log)
+            db.session.commit()
+            
+            # Test Excel
+            response = client.get(f'/api/export/{batch_id}?format=excel')
+            assert response.status_code == 200
+            assert response.headers['Content-Type'] == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            assert f"attachment; filename=sentiment_data_{batch_id[:8]}.xlsx" in response.headers['Content-Disposition']
+
+    def test_export_pdf(self, client, app):
+        """Test export ke PDF"""
+        # Seed data
+        import uuid
+        from models.sentiment_log import SentimentLog, db
+        import json
+        
+        batch_id = str(uuid.uuid4())
+        log = SentimentLog(
+            text="Test export data pdf",
+            label="positif",
+            sentiment_score=0.9,
+            confidence_score=0.95,
+            cluster=0,
+            source="test",
+            metadata_json=json.dumps({'batch_id': batch_id}),
+            model_version="test_v1"
+        )
+        with app.app_context():
+            db.session.add(log)
+            db.session.commit()
+            
+            # Test PDF
+            response = client.get(f'/api/export/{batch_id}?format=pdf')
+            assert response.status_code == 200
+            assert response.headers['Content-Type'] == 'application/pdf'
+            assert f"attachment; filename=sentiment_report_{batch_id[:8]}.pdf" in response.headers['Content-Disposition']
