@@ -67,6 +67,21 @@ logger.info("Modul berhasil dimuat.")
 from utils.monitoring import register_monitoring_routes
 register_monitoring_routes(app, db, redis_conn, analyzer, SentimentLog)
 
+@app.after_request
+def add_security_headers(response):
+    """
+    Add security headers to every response.
+    """
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # HSTS only for production
+    if app.config.get('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+    return response
+
 @app.route('/')
 def index():
     return render_template('index.html', model_trained=analyzer.is_trained)
